@@ -1,408 +1,745 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
-import type { Caderno as C, Resultado, Tela } from "@/lib/tipos";
-
-type Resp = { resultado: Resultado; obs: string; anexos: string[] };
-
-const OPCOES: { v: Resultado; label: string; dica: string; cor: string }[] = [
-  { v: "ok", label: "OK", dica: "Testei tudo e está aprovado.", cor: "emerald" },
-  { v: "nao_ok", label: "NÃO OK", dica: "Testei tudo, mas algo não está certo. Conte o que mudar nas observações.", cor: "rose" },
-  { v: "nao_testado", label: "NÃO TESTADO", dica: "Ainda não consegui testar.", cor: "slate" },
-];
-
-const CHIP: Record<Resultado, string> = {
-  ok: "bg-emerald-100 text-emerald-800",
-  nao_ok: "bg-rose-100 text-rose-800",
-  nao_testado: "bg-slate-200 text-slate-700",
-};
-const ATIVO: Record<string, string> = {
-  emerald: "border-emerald-600 bg-emerald-50 text-emerald-900",
-  rose: "border-rose-600 bg-rose-50 text-rose-900",
-  slate: "border-slate-500 bg-slate-100 text-slate-900",
-};
+import MenuTelas from "@/components/MenuTelas";
+import ModuloView from "@/components/ModuloView";
+import Resumo from "@/components/Resumo";
+import { COR_ICONE, IconeStatus } from "@/components/StatusBadge";
+import TelaView, { OPCOES } from "@/components/TelaView";
+import { dataHora } from "@/lib/formatar";
+import { juntar, resumoTela, ROTULO_STATUS } from "@/lib/status";
+import type { Caderno as C, Evento, Item, Resp, Tela } from "@/lib/tipos";
 
 type Pessoa = { nome: string; email: string };
+type Aceite = { nome: string; criado: string; token: string | null }; // o termo só vem para quem aceitou
+type Fase = "inicio" | "carregando" | "erro" | "ok";
+
+const VAZIA: Resp = { resultado: "nao_testado", obs: "", anexos: [], severidade: null };
+const TIPOS_IMAGEM = ["image/png", "image/jpeg", "image/webp"];
+const MAX_PRINTS = 10;
+const ESPERAS = [1000, 3000, 6000]; // entre as tentativas de salvar quando a rede falha
+const TEMPO = 15000; // uma chamada que passa disso é tratada como falha de rede
+const TRANSITORIOS = [408, 425, 429]; // 4xx que passam sozinhos: tenta de novo, como nos 5xx
+const MSG_DEMOROU = "Demorou demais. Confira sua internet e tente de novo.";
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const demorou = (e: unknown) => e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError");
+const focarTitulo = () => document.getElementById("titulo-tela")?.focus({ preventScroll: true });
+
+// A mensagem do servidor traz "...concluída em DD/MM/AAAA por NOME. ..." : serve de plano B se não der para reler o aceite
+function aceiteDaMensagem(msg?: string): Aceite {
+  const m = msg?.match(/em (\d{2})\/(\d{2})\/(\d{4}) por (.+?)\./);
+  const criado = m ? new Date(`${m[3]}-${m[2]}-${m[1]}T12:00:00-03:00`).toISOString() : new Date().toISOString();
+  return { nome: m ? m[4] : "outra pessoa", criado, token: null };
+}
 
 export default function Caderno({ caderno, slug }: { caderno: C; slug: string }) {
   const [resp, setResp] = useState<Record<string, Resp>>({});
-  const [anterior, setAnterior] = useState<Record<string, Resp>>({});
-  const [salvo, setSalvo] = useState<string | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
-  const [final, setFinal] = useState(false);
-  const [pronto, setPronto] = useState(false);
+  const [historico, setHistorico] = useState<Record<string, Evento[]>>({});
+  const [aceite, setAceite] = useState<Aceite | null>(null); // homologação concluída: caderno só para leitura
+  const [fase, setFase] = useState<Fase>("inicio");
+  const [msgCarga, setMsgCarga] = useState<string | null>(null);
   const [pessoa, setPessoa] = useState<Pessoa | null>(null);
-  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [trocou, setTrocou] = useState(false); // a pessoa acabou de clicar em "Trocar": o foco vai para o campo do nome
+  const [ativa, setAtiva] = useState<string>("");
+  const [abertos, setAbertos] = useState<Record<string, boolean>>({}); // módulos abertos no menu (vale para as duas cópias do menu)
+  const [salvo, setSalvo] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(0); // respostas esperando para serem salvas
+  const [falhas, setFalhas] = useState(0); // respostas que não conseguiram salvar
+  const [bloqueio, setBloqueio] = useState<string | null>(null); // erro que não se resolve tentando de novo
+  const [avisoPerda, setAvisoPerda] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState<Record<string, number>>({});
+  const [erroAnexo, setErroAnexo] = useState<{ id: string; msg: string } | null>(null);
+  const [okAnexo, setOkAnexo] = useState<{ id: string; msg: string } | null>(null);
 
-  async function carregar(p: Pessoa) {
+  // Sempre o valor mais novo, para os envios e o salvamento nunca partirem de um estado velho
+  const respRef = useRef<Record<string, Resp>>({});
+  const telaDoItem = useRef<Record<string, string>>({});
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const voando = useRef<Set<string>>(new Set());
+  const sujos = useRef<Set<string>>(new Set()); // mudou e o servidor ainda não confirmou
+  const falhou = useRef<Set<string>>(new Set());
+  const geracao = useRef(0); // sobe a cada troca de pessoa: o que ficou para trás nunca grava nem mexe na tela
+  const focarAoCarregar = useRef(false);
+  const okTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const primeiraTela = useRef(true);
+  const painel = useRef<HTMLDialogElement>(null);
+  const topo = useRef<HTMLDivElement>(null);
+
+  // ---------- estrutura: módulos > telas > pop-ups ----------
+  const principaisDoModulo = (id: string) => caderno.telas.filter((t) => t.moduloId === id && !t.paiId);
+  const filhosDe = (id: string) => caderno.telas.filter((t) => t.paiId === id);
+  const numeros: Record<string, string> = {};
+  caderno.modulos.forEach((m, mi) => {
+    numeros[m.id] = String(mi + 1);
+    principaisDoModulo(m.id).forEach((t, ti) => {
+      numeros[t.id] = `${mi + 1}.${ti + 1}`;
+      filhosDe(t.id).forEach((f, fj) => (numeros[f.id] = `${mi + 1}.${ti + 1}.${fj + 1}`));
+    });
+  });
+  // telas na ordem do menu, para "anterior" e "próxima"
+  const ordem = caderno.modulos.flatMap((m) => principaisDoModulo(m.id).flatMap((t) => [t, ...filhosDe(t.id)])).map((t) => ({ tela: t, numero: numeros[t.id] }));
+
+  const res = (id: string): Resp => (resp[id] ? { ...VAZIA, ...resp[id], anexos: resp[id].anexos ?? [] } : VAZIA);
+  const resumos = Object.fromEntries(ordem.map(({ tela }) => [tela.id, resumoTela(tela, (id) => res(id).resultado)]));
+  const telasDoModulo = (id: string) => principaisDoModulo(id).flatMap((t) => [t, ...filhosDe(t.id)]);
+  const resumosMod = Object.fromEntries(caderno.modulos.map((m) => [m.id, juntar(telasDoModulo(m.id).map((t) => resumos[t.id]))]));
+  const geral = juntar(ordem.map(({ tela }) => resumos[tela.id]));
+  const jaComecou = Object.values(resp).some((r) => r.resultado !== "nao_testado" || r.obs || r.anexos?.length);
+
+  const idx = ordem.findIndex((o) => o.tela.id === ativa);
+  const atual = idx >= 0 ? ordem[idx] : null;
+  const moduloDaAtiva = caderno.modulos.find((m) => m.id === ativa) ?? null;
+  const moduloAtivo = atual ? atual.tela.moduloId : moduloDaAtiva?.id ?? null;
+  const nomeAtual = atual ? `${atual.numero} ${atual.tela.titulo}` : moduloDaAtiva ? `${numeros[moduloDaAtiva.id]} ${moduloDaAtiva.titulo}` : "Resumo geral";
+
+  function contar() {
+    setOcupado(sujos.current.size - falhou.current.size);
+    setFalhas(falhou.current.size);
+  }
+
+  // ---------- carregar ----------
+  // Abre na tela do endereço (#id); senão na primeira tela que dá para testar e ainda não está finalizada
+  function telaInicial(r: Record<string, Resp>): string {
+    const h = window.location.hash.slice(1);
+    if (h === "resumo" || ordem.some((o) => o.tela.id === h) || caderno.modulos.some((m) => m.id === h)) return h;
+    const aberta = ordem.find(({ tela }) => {
+      const s = resumoTela(tela, (id) => r[id]?.resultado ?? "nao_testado").status;
+      return s === "nao_iniciada" || s === "em_andamento";
+    });
+    return aberta?.tela.id ?? ordem[0]?.tela.id ?? "resumo";
+  }
+
+  async function buscar(p: Pessoa) {
+    const r = await fetch(`/api/respostas?caderno=${encodeURIComponent(slug)}&email=${encodeURIComponent(p.email)}`, { signal: AbortSignal.timeout(TEMPO) });
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    if (!d || typeof d.respostas !== "object" || typeof d.historico !== "object") throw new Error();
+    return d as { respostas: Record<string, Resp>; historico: Record<string, Evento[]>; aceite?: Aceite | null };
+  }
+
+  async function carregar(p: Pessoa, focar = false) {
+    const g = geracao.current;
+    setFase("carregando");
+    setMsgCarga(null);
     try {
-      const r = await fetch(`/api/respostas?caderno=${encodeURIComponent(slug)}&email=${encodeURIComponent(p.email)}`);
-      if (!r.ok) throw new Error();
-      const d = await r.json();
-      setResp(d.atual);
-      setAnterior(d.anterior);
-      setErro(null);
-    } catch {
-      setErro("Não conseguimos carregar suas respostas salvas. Recarregue a página para tentar de novo.");
+      const d = await buscar(p);
+      if (g !== geracao.current) return;
+      focarAoCarregar.current = focar;
+      respRef.current = d.respostas;
+      setResp(d.respostas);
+      setHistorico(d.historico);
+      setAceite(d.aceite ?? null);
+      setAtiva(telaInicial(d.respostas));
+      setFase("ok");
+    } catch (e) {
+      if (g !== geracao.current) return;
+      setMsgCarga(demorou(e) ? MSG_DEMOROU : null);
+      setFase("erro");
+    }
+  }
+
+  // depois de salvar, atualiza só o histórico (as respostas na tela já estão certas)
+  async function atualizarHistorico() {
+    if (!pessoa) return;
+    const g = geracao.current;
+    try {
+      const d = await buscar(pessoa);
+      if (g !== geracao.current) return;
+      setHistorico(d.historico);
+      setAceite(d.aceite ?? null);
+    } catch (e) {
+      console.warn("Não foi possível atualizar o histórico agora; ele continua como estava.", e);
     }
   }
 
   useEffect(() => {
     let p: Pessoa | null = null;
     try {
-      p = JSON.parse(localStorage.getItem("pessoa") ?? "null");
+      const guardada = JSON.parse(localStorage.getItem("pessoa") ?? "null");
+      if (guardada?.nome && guardada?.email) p = { nome: String(guardada.nome), email: String(guardada.email) };
     } catch {}
     /* eslint-disable react-hooks/set-state-in-effect */
     setPessoa(p);
-    setPronto(true);
+    if (!p) setFase("ok");
     /* eslint-enable react-hooks/set-state-in-effect */
     if (p) void carregar(p);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // depois de "Tentar de novo" ou "Começar", o botão some: o foco vai para o título da tela
+  useEffect(() => {
+    if (fase === "ok" && focarAoCarregar.current) {
+      focarAoCarregar.current = false;
+      focarTitulo();
+    }
+  }, [fase]);
+
   function entrar(p: Pessoa) {
+    geracao.current++;
     try {
       localStorage.setItem("pessoa", JSON.stringify(p));
     } catch {}
+    setTrocou(false);
     setPessoa(p);
-    void carregar(p);
+    void carregar(p, true);
   }
 
-  async function gravar(id: string, r: Resp) {
+  function trocarPessoa() {
+    if (sujos.current.size > 0 && !confirm("Ainda há respostas sem salvar. Trocar de pessoa agora pode perdê-las. Trocar mesmo assim?")) return;
+    geracao.current++; // o que estava em andamento para a pessoa anterior para de valer
+    for (const t of Object.values(timers.current)) clearTimeout(t);
+    timers.current = {};
+    voando.current.clear();
+    telaDoItem.current = {};
     try {
-      const x = await fetch("/api/respostas", {
-        method: "PUT",
+      localStorage.removeItem("pessoa");
+    } catch {}
+    respRef.current = {};
+    sujos.current.clear();
+    falhou.current.clear();
+    contar();
+    setResp({});
+    setHistorico({});
+    setAceite(null);
+    setSalvo(null);
+    setBloqueio(null);
+    setAvisoPerda(null);
+    setEnviando({});
+    setErroAnexo(null);
+    setOkAnexo(null);
+    setTrocou(true);
+    setPessoa(null);
+    setFase("ok");
+  }
+
+  // ---------- salvar ----------
+  function corpo(tela: string, item: string, r: Resp) {
+    return JSON.stringify({ caderno: slug, tela, item, ...pessoa, ...r });
+  }
+
+  // O servidor disse que a homologação foi concluída: a tela vira só leitura, mesmo que reler as respostas falhe
+  async function lidarComAceito(msg: string | undefined, g: number) {
+    setAceite((a) => a ?? aceiteDaMensagem(msg));
+    setAvisoPerda("Sua última alteração não foi salva porque a homologação foi concluída.");
+    try {
+      if (pessoa) {
+        const d = await buscar(pessoa);
+        if (g !== geracao.current) return;
+        respRef.current = d.respostas;
+        setResp(d.respostas);
+        setHistorico(d.historico);
+        setAceite(d.aceite ?? null);
+      }
+    } catch (e) {
+      console.warn("Não foi possível reler as respostas depois da conclusão.", e);
+    }
+    if (g !== geracao.current) return;
+    sujos.current.clear();
+    falhou.current.clear();
+  }
+
+  // Uma gravação de cada vez por funcionalidade. Tenta de novo se a rede falhar ou demorar. Se o servidor recusar (4xx), avisa e para.
+  async function salvar(item: string) {
+    if (voando.current.has(item) || bloqueio) return;
+    const g = geracao.current;
+    voando.current.add(item);
+    let tentativa = 0;
+    for (;;) {
+      if (g !== geracao.current) return; // trocou de pessoa: abandona sem mexer em nada
+      const valor: Resp = { ...VAZIA, ...respRef.current[item] };
+      const enviado = JSON.stringify(valor);
+      let status = 0;
+      let msg: string | undefined;
+      let codigo: string | undefined;
+      try {
+        const x = await fetch("/api/respostas", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: corpo(telaDoItem.current[item], item, valor),
+          signal: AbortSignal.timeout(TEMPO),
+        });
+        status = x.status;
+        if (!x.ok) {
+          const j = await x.json().catch(() => null);
+          msg = j?.erro;
+          codigo = j?.codigo;
+        }
+      } catch {
+        status = 0; // sem rede ou demorou demais: trata como falha passageira
+      }
+      if (g !== geracao.current) return;
+      if (status >= 200 && status < 300) {
+        if (JSON.stringify({ ...VAZIA, ...respRef.current[item] }) !== enviado) {
+          tentativa = 0;
+          continue; // a pessoa mudou algo durante o envio: manda de novo
+        }
+        sujos.current.delete(item);
+        falhou.current.delete(item);
+        setSalvo(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
+        break;
+      }
+      if (status === 409 && codigo === "aceito") {
+        await lidarComAceito(msg, g);
+        break;
+      }
+      if (status >= 400 && status < 500 && !TRANSITORIOS.includes(status)) {
+        setBloqueio(msg ?? "Não foi possível salvar. Recarregue a página e tente de novo.");
+        break;
+      }
+      if (tentativa >= ESPERAS.length) {
+        falhou.current.add(item);
+        break;
+      }
+      await esperar(ESPERAS[tentativa++]);
+    }
+    if (g !== geracao.current) return;
+    voando.current.delete(item);
+    contar();
+    if (sujos.current.size === 0) void atualizarHistorico();
+  }
+
+  function tentarDeNovo() {
+    for (const item of Array.from(falhou.current)) {
+      falhou.current.delete(item);
+      void salvar(item);
+    }
+    contar();
+    focarTitulo(); // o aviso com este botão some: o foco não pode ficar perdido
+  }
+
+  function mudar(tela: Tela, item: Item, patch: Partial<Resp>) {
+    if (aceite) return; // depois do aceite nada muda
+    const nova: Resp = { ...VAZIA, ...respRef.current[item.id], ...patch };
+    if (nova.resultado !== "nao_ok") nova.severidade = null; // a gravidade só vale para NÃO OK
+    respRef.current = { ...respRef.current, [item.id]: nova };
+    setResp(respRef.current);
+    telaDoItem.current[item.id] = tela.id;
+    sujos.current.add(item.id);
+    clearTimeout(timers.current[item.id]);
+    timers.current[item.id] = setTimeout(() => {
+      delete timers.current[item.id];
+      void salvar(item.id);
+    }, 600);
+    contar();
+  }
+
+  // Se a pessoa fechar ou esconder a página, manda o que ainda estava esperando (menos o que já está sendo enviado)
+  useEffect(() => {
+    function descarregar() {
+      if (!pessoa || bloqueio) return;
+      for (const item of sujos.current) {
+        const tela = telaDoItem.current[item];
+        if (!tela || voando.current.has(item)) continue;
+        try {
+          void fetch("/api/respostas", { method: "PUT", headers: { "Content-Type": "application/json" }, body: corpo(tela, item, { ...VAZIA, ...respRef.current[item] }), keepalive: true });
+        } catch {}
+      }
+    }
+    function aoSair(e: BeforeUnloadEvent) {
+      // com falha ou bloqueio, qualquer resposta ainda sem salvar se perde ao fechar
+      if ((bloqueio || falhou.current.size > 0) && sujos.current.size > 0) e.preventDefault();
+    }
+    const aoEsconder = () => document.visibilityState === "hidden" && descarregar();
+    window.addEventListener("pagehide", descarregar);
+    document.addEventListener("visibilitychange", aoEsconder);
+    window.addEventListener("beforeunload", aoSair);
+    return () => {
+      window.removeEventListener("pagehide", descarregar);
+      document.removeEventListener("visibilitychange", aoEsconder);
+      window.removeEventListener("beforeunload", aoSair);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pessoa, bloqueio]);
+
+  // ---------- concluir a homologação ----------
+  // devolve a mensagem de erro, ou null se deu certo
+  async function concluir(): Promise<string | null> {
+    if (!pessoa) return "Entre de novo com seu nome e e-mail.";
+    try {
+      const r = await fetch("/api/aceite", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caderno: slug, tela: id, ...pessoa, ...r }),
+        body: JSON.stringify({ caderno: slug, nome: pessoa.nome, email: pessoa.email, ciente: true }),
+        signal: AbortSignal.timeout(TEMPO),
       });
-      if (!x.ok) throw new Error();
-      setErro(null);
-      setSalvo(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
-    } catch {
-      setErro("Não conseguimos salvar agora. Sua resposta continua na tela; ela tenta de novo na próxima alteração.");
+      const j = await r.json().catch(() => null);
+      if (!r.ok) {
+        if (r.status === 409) void atualizarHistorico(); // talvez já tenha sido concluída: relê para a tela refletir
+        return j?.erro ?? "Não conseguimos concluir agora. Tente de novo.";
+      }
+      setAceite({ nome: pessoa.nome, criado: new Date().toISOString(), token: j.token });
+      return null;
+    } catch (e) {
+      return demorou(e) ? MSG_DEMOROU : "Não conseguimos concluir agora. Confira sua internet e tente de novo.";
     }
   }
 
-  function atualizar(id: string, p: Partial<Resp>) {
-    const nova = { ...res(id), ...p };
-    setResp({ ...resp, [id]: nova });
-    clearTimeout(timers.current[id]);
-    timers.current[id] = setTimeout(() => gravar(id, nova), 600);
-  }
-
-  const res = (id: string): Resp => (resp[id] ? { ...resp[id], anexos: resp[id].anexos ?? [] } : { resultado: "nao_testado", obs: "", anexos: [] });
-  // Telas a testar nesta rodada (no topo) e telas já aprovadas antes (recolhidas, só para consulta)
-  const ativas = caderno.telas.filter((t) => t.refazer);
-  const total = ativas.length;
-  const avaliadas = ativas.filter((t) => res(t.id).resultado !== "nao_testado").length;
-  const contagem = (r: Resultado) => ativas.filter((t) => res(t.id).resultado === r).length;
-  const semObs = ativas.filter((t) => res(t.id).resultado === "nao_ok" && !res(t.id).obs.trim());
-
-  const [enviando, setEnviando] = useState<string | null>(null);
-  const [erroAnexo, setErroAnexo] = useState<{ id: string; msg: string } | null>(null);
-
-  async function anexar(id: string, files: FileList) {
+  // ---------- anexos ----------
+  async function anexar(tela: Tela, item: Item, files: FileList) {
     setErroAnexo(null);
+    setOkAnexo(null);
     const novos: string[] = [];
-    setEnviando(id);
+    const avisos: string[] = [];
+    setEnviando((e) => ({ ...e, [item.id]: (e[item.id] ?? 0) + 1 }));
+    const jaTem = (respRef.current[item.id]?.anexos ?? []).length;
     for (const f of Array.from(files)) {
-      if (!f.type.startsWith("image/") || f.size > 5 * 1024 * 1024) {
-        setErroAnexo({ id, msg: `“${f.name}” não foi enviado. Use uma imagem (PNG, JPG ou WebP) de até 5 MB.` });
+      if (jaTem + novos.length >= MAX_PRINTS) {
+        avisos.push(`Limite de ${MAX_PRINTS} prints por funcionalidade. “${f.name}” não foi enviado.`);
+        continue;
+      }
+      if (!TIPOS_IMAGEM.includes(f.type)) {
+        avisos.push(`“${f.name}” não é aceito. Use uma imagem PNG, JPG ou WebP.`);
+        continue;
+      }
+      if (f.size > 5 * 1024 * 1024) {
+        avisos.push(`“${f.name}” passou de 5 MB. Reduza o tamanho e tente de novo.`);
         continue;
       }
       try {
         const b = await upload(f.name, f, { access: "public", handleUploadUrl: "/api/upload", clientPayload: slug });
         novos.push(b.url);
       } catch {
-        setErroAnexo({ id, msg: `Não conseguimos enviar “${f.name}”. Confira sua internet e tente de novo.` });
+        avisos.push(`Não conseguimos enviar “${f.name}”. Confira sua internet e tente de novo. Se continuar, avise quem preparou o caderno.`);
       }
     }
-    setEnviando(null);
-    if (novos.length) atualizar(id, { anexos: [...res(id).anexos, ...novos].slice(0, 10) });
+    setEnviando((e) => ({ ...e, [item.id]: Math.max(0, (e[item.id] ?? 1) - 1) }));
+    if (avisos.length) setErroAnexo({ id: item.id, msg: avisos.join(" ") });
+    if (novos.length) {
+      // lê o estado de agora, não o de quando o envio começou
+      mudar(tela, item, { anexos: [...(respRef.current[item.id]?.anexos ?? []), ...novos].slice(0, MAX_PRINTS) });
+      setOkAnexo({ id: item.id, msg: novos.length === 1 ? "1 print anexado" : `${novos.length} prints anexados` });
+      clearTimeout(okTimer.current);
+      okTimer.current = setTimeout(() => setOkAnexo(null), 6000);
+    }
   }
 
-  // Telas principais e pop-ups. Cada pop-up aparece dentro do cartão da tela pai.
-  const principais = caderno.telas.filter((t) => !t.paiId);
-  const filhosDe = (id: string) => caderno.telas.filter((t) => t.paiId === id);
-  const grupoAtivo = (t: Tela) => t.refazer || filhosDe(t.id).some((f) => f.refazer);
-  const gruposAtivos = principais.filter(grupoAtivo);
-  const aprovadasLinhas = principais.filter((t) => !grupoAtivo(t)).flatMap((t) => [t, ...filhosDe(t.id)]);
-  const ordenadas = principais.flatMap((t) => [t, ...filhosDe(t.id)]); // para o resumo de impressão
+  // ---------- navegação ----------
+  function ir(id: string) {
+    setAtiva(id);
+    try {
+      window.history.replaceState(null, "", `#${id}`);
+    } catch {}
+    painel.current?.close();
+    topo.current?.scrollIntoView({ block: "start" });
+  }
 
-  const blocoFilhos = (t: Tela, num: string): ReactNode => {
-    const fs = filhosDe(t.id);
-    if (!fs.length) return null;
+  // Ao trocar de tela: atualiza o título da aba e leva o foco para o título novo (leitor de tela e teclado)
+  useEffect(() => {
+    if (!ativa) return;
+    document.title = `${nomeAtual} · ${caderno.titulo}`;
+    if (primeiraTela.current) {
+      primeiraTela.current = false;
+      return;
+    }
+    focarTitulo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ativa]);
+
+  // O painel de telas do celular não pode ficar aberto se a janela virar larga (ex.: girar o tablet)
+  useEffect(() => {
+    const m = window.matchMedia("(min-width: 1024px)");
+    const fechar = () => m.matches && painel.current?.close();
+    m.addEventListener("change", fechar);
+    return () => m.removeEventListener("change", fechar);
+  }, []);
+
+  if (fase === "inicio") return null;
+  if (!pessoa) return <Entrada titulo={caderno.titulo} onEntrar={entrar} focarNome={trocou} />;
+
+  const cabecalho = (
+    <header className="border-b border-slate-200 bg-white print:border-0">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-4">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-indigo-800">Caderno de testes de homologação</p>
+          <h1 className="break-words text-balance text-xl font-semibold sm:text-2xl">{caderno.titulo}</h1>
+          <p className="text-sm text-slate-600">
+            Versão {caderno.versao} · {caderno.data} · Preparado por {caderno.preparadoPor}
+          </p>
+          <p className="hidden text-sm print:block">Respondido por {pessoa.nome} ({pessoa.email}) em {new Date().toLocaleString("pt-BR")}</p>
+        </div>
+        <div className="text-xs text-slate-700 print:hidden">
+          <p aria-live="polite">
+            {bloqueio ? "Recarregue a página para continuar" : falhas > 0 ? "Há respostas sem salvar" : ocupado > 0 ? "Salvando…" : salvo ? `Salvo às ${salvo}` : "Suas respostas são salvas sozinhas"}
+          </p>
+          <p className="mt-0.5">
+            {pessoa.nome} ·{" "}
+            <button type="button" onClick={trocarPessoa} className={`rounded underline ${FOCO}`}>
+              Não é você? Trocar
+            </button>
+          </p>
+        </div>
+      </div>
+    </header>
+  );
+
+  if (fase !== "ok") {
     return (
-      <div className="space-y-3 rounded-md border-l-4 border-indigo-300 bg-indigo-50/50 p-3 sm:p-4">
-        <h3 className="text-sm font-semibold text-indigo-900">Pop-ups e janelas desta tela ({fs.length})</h3>
-        {fs.map((f, j) =>
-          f.refazer ? (
-            cartao(f, `${num}.${j + 1}`, t.titulo)
+      <div className="min-h-screen">
+        {cabecalho}
+        <main className="mx-auto max-w-2xl px-4 py-10">
+          {fase === "carregando" ? (
+            <p role="status" className="text-sm text-slate-700">Carregando suas respostas…</p>
           ) : (
-            <div key={f.id} className="flex items-center justify-between gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm">
-              <span><span className="font-medium">{num}.{j + 1}</span> {f.titulo}</span>
-              <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">APROVADO</span>
+            <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-950">
+              <p className="font-semibold">Não conseguimos carregar suas respostas salvas.</p>
+              {msgCarga && <p className="mt-1">{msgCarga}</p>}
+              <p className="mt-1">Para não apagar nada por engano, só liberamos o caderno depois de carregar. Confira sua internet e tente de novo.</p>
+              <button type="button" onClick={() => carregar(pessoa, true)} className={`mt-3 min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>
+                Tentar de novo
+              </button>
             </div>
-          ),
-        )}
+          )}
+        </main>
       </div>
     );
-  };
+  }
 
-  const cartao = (t: Tela, num: string, popupDe?: string): ReactNode => {
-    const r = res(t.id);
-    return (
-      <details key={t.id} className={`group rounded-lg border bg-white ${popupDe ? "border-indigo-200" : "border-slate-200"}`}>
-        <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 sm:px-5">
-          <span className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 px-1.5 text-sm font-medium">{num}</span>
-          <span className="flex-1 font-medium">
-            {popupDe && <span className="mr-2 inline-block rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-semibold text-indigo-800">Pop-up de “{popupDe}”</span>}
-            {t.titulo}
-          </span>
-          <span className={`rounded px-2 py-0.5 text-xs font-semibold ${CHIP[r.resultado]}`}>
-            {OPCOES.find((o) => o.v === r.resultado)!.label}
-          </span>
-        </summary>
+  const rotulo = (o?: { tela: Tela; numero: string }) => (o ? `${o.numero} ${o.tela.titulo}` : "");
+  const voltar = idx > 0 ? { id: ordem[idx - 1].tela.id, rotulo: rotulo(ordem[idx - 1]) } : null;
+  const avancar = atual ? (idx < ordem.length - 1 ? { id: ordem[idx + 1].tela.id, rotulo: rotulo(ordem[idx + 1]) } : { id: "resumo", rotulo: "Resumo geral" }) : null;
+  const pai = atual?.tela.paiId ? (caderno.telas.find((t) => t.id === atual.tela.paiId) ?? null) : null;
+  const statusAtual = atual ? resumos[atual.tela.id] : moduloDaAtiva ? resumosMod[moduloDaAtiva.id] : null;
+  const modulosResumo = caderno.modulos.map((m) => ({
+    modulo: m,
+    numero: numeros[m.id],
+    resumo: resumosMod[m.id],
+    telas: telasDoModulo(m.id).map((t) => ({ tela: t, numero: numeros[t.id] })),
+  }));
 
-        <div className="space-y-5 border-t border-slate-100 px-4 py-4 sm:px-5">
-          {t.imagem && <Imagem src={t.imagem} alt={`Imagem ${popupDe ? "do pop-up" : "da tela"} ${t.titulo}`} className="w-full rounded-md border border-slate-200" />}
+  // o menu aparece duas vezes (lateral e painel do celular): ids diferentes, mas o mesmo estado de módulos abertos
+  const menu = (instancia: string) => (
+    <MenuTelas
+      instancia={instancia}
+      modulos={caderno.modulos}
+      principaisDoModulo={principaisDoModulo}
+      filhosDe={filhosDe}
+      numeros={numeros}
+      resumos={resumos}
+      resumosMod={resumosMod}
+      geral={geral}
+      ativa={ativa}
+      moduloAtivo={moduloAtivo}
+      aoIr={ir}
+      abertos={abertos}
+      definirAberto={(id, v) => setAbertos((a) => ({ ...a, [id]: v }))}
+    />
+  );
 
-          <div className="flex flex-wrap gap-2 no-print">
-            {t.link && (
-              <a href={t.link} target="_blank" rel="noreferrer" className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                Abrir a tela para testar
-              </a>
-            )}
-            {t.pdf && (
-              <a href={t.pdf} target="_blank" rel="noreferrer" className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50">
-                Ver PDF das funcionalidades
-              </a>
-            )}
+  return (
+    <div className="min-h-screen">
+      <a href="#conteudo" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg print:hidden">
+        Pular para o conteúdo
+      </a>
+      {cabecalho}
+
+      <div className="mx-auto max-w-6xl px-4 py-5 print:hidden lg:grid lg:grid-cols-[19rem_minmax(0,1fr)] lg:gap-8">
+        <aside className="hidden lg:block" aria-label="Menu">
+          <div className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain pb-4">{menu("lateral")}</div>
+        </aside>
+
+        <main id="conteudo" tabIndex={-1} className="focus:outline-none">
+          <div ref={topo} className="scroll-mt-4" />
+
+          {/* Celular: botão que abre a lista de telas */}
+          <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-slate-200 bg-slate-50/95 px-4 py-2 backdrop-blur lg:hidden">
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => painel.current?.showModal()}
+              className={`flex min-h-11 w-full items-center gap-3 rounded-md border border-slate-400 bg-white px-3 py-1 text-left text-sm ${FOCO}`}
+            >
+              {statusAtual && <span className={COR_ICONE[statusAtual.status]}><IconeStatus status={statusAtual.status} /></span>}
+              <span className="min-w-0 flex-1">
+                <span className="block break-words font-semibold">{nomeAtual}</span>
+                <span className="block text-xs text-slate-700">
+                  {statusAtual ? `${ROTULO_STATUS[statusAtual.status]}${statusAtual.total ? ` · ${statusAtual.ok} de ${statusAtual.total} OK` : ""} · ` : ""}
+                  ver todas as telas
+                </span>
+              </span>
+              <svg viewBox="0 0 20 20" className="h-5 w-5 text-slate-600" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
           </div>
 
-          <div>
-            <h3 className="text-sm font-semibold">O que cada item faz</h3>
-            <ul className="mt-2 divide-y divide-slate-100 text-sm">
-              {t.itens.map((it, k) => (
-                <li key={k} className="py-2">
-                  <span className="whitespace-pre-wrap font-medium">{it.nome}:</span> <span className="whitespace-pre-wrap text-slate-700">{it.faz}</span>
-                  {it.imagem && <Imagem src={it.imagem} alt={`Imagem do item ${it.nome}`} className="mt-2 max-h-72 rounded-md border border-slate-200" />}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {anterior[t.id] && (
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-              <p className="font-medium">Na rodada anterior você marcou {OPCOES.find((o) => o.v === anterior[t.id].resultado)?.label}.</p>
-              {anterior[t.id].obs && <p className="mt-1 whitespace-pre-wrap text-slate-700">{anterior[t.id].obs}</p>}
+          {bloqueio && (
+            <div role="alert" className="mb-3 rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950">
+              <p className="font-semibold">{bloqueio}</p>
+              <p className="mt-1">As respostas já salvas continuam lá. Alterações que ainda não tinham sido salvas serão perdidas ao recarregar.</p>
+              <button type="button" onClick={() => window.location.reload()} className={`mt-2 min-h-11 rounded-md bg-rose-700 px-4 text-sm font-medium text-white hover:bg-rose-800 ${FOCO}`}>
+                Recarregar a página
+              </button>
             </div>
           )}
 
-          <fieldset>
-            <legend className="text-sm font-semibold">Resultado{popupDe ? " deste pop-up" : ""}</legend>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
-              {OPCOES.map((o) => (
-                <label key={o.v} className={`cursor-pointer rounded-md border px-3 py-2 text-center text-sm font-semibold ${r.resultado === o.v ? ATIVO[o.cor] : "border-slate-300 hover:bg-slate-50"}`}>
-                  <input type="radio" name={`r-${t.id}`} className="sr-only" checked={r.resultado === o.v} onChange={() => atualizar(t.id, { resultado: o.v })} />
-                  {o.label}
-                </label>
-              ))}
+          {falhas > 0 && !bloqueio && (
+            <div role="alert" className="mb-3 rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950">
+              <p className="font-semibold">
+                {falhas === 1 ? "1 resposta ainda não foi salva." : `${falhas} respostas ainda não foram salvas.`}
+              </p>
+              <p className="mt-1">Elas continuam aqui na tela. Confira sua internet e tente de novo. Não feche a página antes disso.</p>
+              <button type="button" onClick={tentarDeNovo} className={`mt-2 min-h-11 rounded-md bg-rose-700 px-4 text-sm font-medium text-white hover:bg-rose-800 ${FOCO}`}>
+                Tentar salvar de novo
+              </button>
             </div>
-          </fieldset>
+          )}
 
-          <div>
-            <label htmlFor={`o-${t.id}`} className="text-sm font-semibold">
-              Observações {r.resultado === "nao_ok" && <span className="font-normal text-rose-700">(conte o que precisa mudar)</span>}
-            </label>
-            <textarea
-              id={`o-${t.id}`}
-              rows={3}
-              value={r.obs}
-              onChange={(e) => atualizar(t.id, { obs: e.target.value })}
-              placeholder="Escreva aqui o que achou, dúvidas ou o que precisa mudar."
-              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-            />
-            <div className="mt-3 no-print">
-              <label className="inline-block cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50">
-                Anexar print
-                <input type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" onChange={(e) => { if (e.target.files?.length) void anexar(t.id, e.target.files); e.target.value = ""; }} />
-              </label>
-              {enviando === t.id && <span className="ml-2 text-sm text-slate-600">Enviando…</span>}
-              {erroAnexo?.id === t.id && <p role="alert" className="mt-1 text-sm text-rose-700">{erroAnexo.msg}</p>}
-              {r.anexos.length > 0 && (
-                <ul className="mt-3 flex flex-wrap gap-3">
-                  {r.anexos.map((u) => (
-                    <li key={u} className="relative">
-                      <a href={u} target="_blank" rel="noreferrer">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={u} alt="Print anexado" className="h-20 w-28 rounded-md border border-slate-200 object-cover" />
-                      </a>
-                      <button type="button" aria-label="Remover print" onClick={() => atualizar(t.id, { anexos: r.anexos.filter((x) => x !== u) })} className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-xs text-white">×</button>
-                    </li>
-                  ))}
-                </ul>
+          {aceite && (
+            <div role="status" className="mb-3 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+              <p className="font-semibold">Homologação concluída por {aceite.nome} em {dataHora(aceite.criado)}.</p>
+              <p className="mt-1">O caderno está só para leitura. Para mudar algo, peça a quem preparou o caderno para reabrir.</p>
+              {aceite.token && (
+                <a href={`/api/aceite/${aceite.token}/pdf`} target="_blank" rel="noreferrer" className={`mt-2 inline-flex min-h-11 items-center rounded-md border border-emerald-700 bg-white px-4 font-medium text-emerald-950 hover:bg-emerald-100 ${FOCO}`}>
+                  Baixar termo de aceite (PDF)<span className="sr-only"> (abre em nova aba)</span>
+                </a>
               )}
             </div>
+          )}
+
+          {avisoPerda && (
+            <div role="alert" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              {avisoPerda}
+            </div>
+          )}
+
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <strong>Ambiente de homologação.</strong> Isto é um teste: nada do que você fizer aqui afeta o sistema real.
           </div>
 
-          {!popupDe && blocoFilhos(t, num)}
-        </div>
-      </details>
-    );
-  };
-
-  if (!pronto) return null;
-  if (!pessoa) return <Entrada titulo={caderno.titulo} onEntrar={entrar} />;
-
-  return (
-    <main className="mx-auto max-w-3xl px-4 py-6 sm:py-10">
-      <header>
-        <p className="text-sm font-medium text-indigo-700">Rodada {caderno.rodada}</p>
-        <h1 className="mt-1 text-2xl font-semibold sm:text-3xl">{caderno.titulo}</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Versão {caderno.versao} · {caderno.data} · Preparado por {caderno.preparadoPor}
-        </p>
-        <p className="mt-1 hidden text-sm print:block">Respondido por {pessoa.nome} ({pessoa.email}) em {new Date().toLocaleString("pt-BR")}</p>
-      </header>
-
-      {caderno.rodada > 1 && (
-        <div className="mt-5 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900 print:hidden">
-          <strong>Rodada {caderno.rodada}.</strong> Teste só as telas abaixo, que precisam ser refeitas. As que já foram aprovadas ficam guardadas no final da página.
-        </div>
-      )}
-
-      <div className="mt-5 rounded-lg border border-amber-300 print:hidden bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        <strong>Ambiente de teste.</strong> Nada do que você fizer aqui afeta o sistema real.
-      </div>
-
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-4 sm:p-5 print:hidden">
-        <h2 className="font-semibold">Como usar</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Abra cada tela, veja a imagem, leia o que ela faz e escolha um resultado:
-        </p>
-        <ul className="mt-3 space-y-2 text-sm">
-          {OPCOES.map((o) => (
-            <li key={o.v} className="flex flex-wrap items-center gap-2">
-              <span className={`rounded px-2 py-0.5 text-xs font-semibold ${CHIP[o.v]}`}>{o.label}</span>
-              <span className="text-slate-700">{o.dica}</span>
-            </li>
-          ))}
-        </ul>
-        {caderno.antesDeComecar.length > 0 && (
-          <>
-            <h3 className="mt-4 text-sm font-semibold">Antes de começar</h3>
-            <ul className="mt-1 list-disc pl-5 text-sm text-slate-700">
-              {caderno.antesDeComecar.map((a) => <li key={a}>{a}</li>)}
-            </ul>
-          </>
-        )}
-      </section>
-
-      <div className="sticky top-0 z-10 -mx-4 mt-6 flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/95 px-4 py-3 backdrop-blur no-print">
-        <p className="text-sm font-medium">{avaliadas} de {total} telas avaliadas</p>
-        <p className="text-xs text-slate-500" aria-live="polite">{salvo ? `Salvo às ${salvo}` : "Salva sozinho"}</p>
-      </div>
-      {erro && <p role="alert" className="mt-3 rounded-md print:hidden bg-rose-50 px-3 py-2 text-sm text-rose-800">{erro}</p>}
-
-      <div className="mt-4 space-y-3 print:hidden">
-        {ativas.length === 0 && <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Não há telas para testar nesta rodada. Tudo já foi aprovado.</p>}
-        {gruposAtivos.map((t) => {
-          const num = String(principais.indexOf(t) + 1);
-          if (t.refazer) return cartao(t, num);
-          // tela principal já aprovada, mas com pop-up para refazer: fica só como contexto
-          return (
-            <div key={t.id} className="rounded-lg border border-emerald-200 bg-white p-4 sm:p-5">
-              <div className="flex items-center gap-3">
-                <span className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 px-1.5 text-sm font-medium">{num}</span>
-                <span className="flex-1 font-medium">{t.titulo}</span>
-                <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">APROVADA</span>
-              </div>
-              <p className="mt-2 text-sm text-slate-600">Esta tela já foi aprovada. Só os pop-ups abaixo precisam ser refeitos.</p>
-              <div className="mt-3">{blocoFilhos(t, num)}</div>
-            </div>
-          );
-        })}
-      </div>
-
-      {aprovadasLinhas.length > 0 && (
-        <details className="mt-6 rounded-lg border border-emerald-200 bg-white print:hidden">
-          <summary className="cursor-pointer list-none px-4 py-3 font-medium text-emerald-900 sm:px-5">
-            Já aprovadas em rodadas anteriores ({aprovadasLinhas.length})
-          </summary>
-          <ul className="divide-y divide-slate-100 border-t border-slate-100">
-            {aprovadasLinhas.map((t) => (
-              <li key={t.id} className={`flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm sm:px-5 ${t.paiId ? "pl-8 sm:pl-10" : ""}`}>
-                <span className="font-medium">{t.paiId && "↳ Pop-up: "}{t.titulo}</span>
-                <span className="flex items-center gap-3">
-                  {t.pdf && <a href={t.pdf} target="_blank" rel="noreferrer" className="text-indigo-700 underline">PDF</a>}
-                  {t.link && <a href={t.link} target="_blank" rel="noreferrer" className="text-indigo-700 underline">Abrir tela</a>}
-                  <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">APROVADA</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      <section className="mt-8 rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-        <h2 className="font-semibold">Resultado final</h2>
-        {!final ? (
-          <>
-            <p className="mt-1 text-sm text-slate-600">Quando terminar, clique em finalizar para ver o resumo.</p>
-            <button onClick={() => setFinal(true)} className="mt-3 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 no-print">
-              Finalizar
-            </button>
-          </>
-        ) : (
-          <>
-            <p className="mt-2 text-sm">
-              <strong>{contagem("ok")}</strong> OK · <strong>{contagem("nao_ok")}</strong> NÃO OK · <strong>{contagem("nao_testado")}</strong> NÃO TESTADO
-            </p>
-            {semObs.length > 0 && (
-              <p className="mt-2 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-800">
-                Falta contar o que mudar em: {semObs.map((t) => t.titulo).join(", ")}. Abra a tela e escreva nas observações.
-              </p>
-            )}
-            {contagem("nao_testado") > 0 && (
-              <p className="mt-2 text-sm text-slate-600">Ainda há telas não testadas. Você pode voltar e continuar depois, usando este mesmo link.</p>
-            )}
-            <table className="mt-4 hidden w-full border-collapse text-sm print:table">
-              <thead><tr className="border-b border-slate-400 text-left"><th className="py-1 pr-3">Tela</th><th className="py-1 pr-3">Resultado</th><th className="py-1">Observações</th></tr></thead>
-              <tbody>
-                {ordenadas.map((t) => (
-                  <tr key={t.id} className="border-b border-slate-200 align-top">
-                    <td className="py-1 pr-3 font-medium">{t.paiId && "↳ Pop-up: "}{t.titulo}</td>
-                    <td className="py-1 pr-3 whitespace-nowrap">{t.refazer ? OPCOES.find((o) => o.v === res(t.id).resultado)!.label : "APROVADA ANTES"}</td>
-                    <td className="py-1 whitespace-pre-wrap">{res(t.id).obs}{res(t.id).anexos.length > 0 && ` (${res(t.id).anexos.length} print${res(t.id).anexos.length > 1 ? "s" : ""} anexado${res(t.id).anexos.length > 1 ? "s" : ""})`}</td>
-                  </tr>
+          <details open={!jaComecou} className="mt-3 rounded-lg border border-slate-200 bg-white">
+            <summary className={`flex min-h-11 cursor-pointer items-center rounded-lg px-4 text-sm font-semibold ${FOCO}`}>Como usar este caderno</summary>
+            <div className="border-t border-slate-100 px-4 py-3 text-sm text-slate-700">
+              <p>Escolha um módulo e uma tela no menu, veja a imagem e dê um resultado para cada funcionalidade dela:</p>
+              <ul className="mt-2 space-y-1">
+                {OPCOES.map((o) => (
+                  <li key={o.v}><strong>{o.label}:</strong> {o.dica}</li>
                 ))}
-              </tbody>
-            </table>
-            <div className="mt-3 flex gap-2 no-print">
-              <button onClick={() => window.print()} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50">
-                Imprimir ou salvar em PDF
-              </button>
-              <button onClick={() => setFinal(false)} className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">
-                Voltar
-              </button>
+              </ul>
+              <p className="mt-2">O que estiver NÃO OK vai como alerta para quem corrige. Quando for corrigido, você será avisado na própria funcionalidade para testar de novo. Tudo fica registrado no histórico.</p>
+              {caderno.antesDeComecar.length > 0 && (
+                <>
+                  <p className="mt-3 font-semibold">Antes de começar</p>
+                  <ul className="mt-1 list-disc pl-5">{caderno.antesDeComecar.map((a) => <li key={a}>{a}</li>)}</ul>
+                </>
+              )}
             </div>
-          </>
-        )}
+          </details>
+
+          <div className="mt-6">
+            {atual ? (
+              <TelaView
+                key={atual.tela.id}
+                tela={atual.tela}
+                numero={atual.numero}
+                pai={pai}
+                filhos={filhosDe(atual.tela.id).map((f) => ({ tela: f, numero: numeros[f.id] }))}
+                resumos={resumos}
+                res={res}
+                historico={historico}
+                aoMudar={mudar}
+                aoIr={ir}
+                voltar={voltar}
+                avancar={avancar}
+                aoAnexar={anexar}
+                enviando={enviando}
+                erroAnexo={erroAnexo}
+                okAnexo={okAnexo}
+                somenteLeitura={!!aceite}
+              />
+            ) : moduloDaAtiva ? (
+              <ModuloView
+                key={moduloDaAtiva.id}
+                modulo={moduloDaAtiva}
+                numero={numeros[moduloDaAtiva.id]}
+                resumo={resumosMod[moduloDaAtiva.id]}
+                telas={telasDoModulo(moduloDaAtiva.id).map((t) => ({ tela: t, numero: numeros[t.id] }))}
+                resumos={resumos}
+                aoIr={ir}
+              />
+            ) : (
+              <Resumo modulos={modulosResumo} resumos={resumos} geral={geral} res={res} aoIr={ir} pendentes={ocupado} falhas={falhas} bloqueado={!!bloqueio} pessoa={pessoa} aceite={aceite} aoConcluir={concluir} />
+            )}
+          </div>
+        </main>
+      </div>
+
+      {/* Celular: lista de telas em tela cheia */}
+      <dialog
+        ref={painel}
+        aria-labelledby="titulo-painel"
+        onClick={(e) => { if (e.target === e.currentTarget) painel.current?.close(); }}
+        className="m-0 h-full max-h-none w-full max-w-none overflow-y-auto overscroll-contain bg-slate-50 p-0 lg:hidden"
+      >
+        <div className="mx-auto max-w-md p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 id="titulo-painel" className="text-lg font-semibold">Módulos e telas</h2>
+            <button type="button" onClick={() => painel.current?.close()} className={`min-h-11 rounded-md border border-slate-400 bg-white px-4 text-sm font-medium ${FOCO}`}>Fechar</button>
+          </div>
+          {menu("painel")}
+        </div>
+      </dialog>
+
+      {/* Impressão: tudo numa tabela, qualquer que seja a tela aberta */}
+      <section className="hidden px-4 print:block" aria-label="Resumo para impressão">
+        <table className="mt-2 w-full border-collapse text-sm">
+          <caption className="mb-2 text-left font-semibold">Resultado de cada funcionalidade</caption>
+          <thead>
+            <tr className="border-b border-slate-400 text-left">
+              <th scope="col" className="py-1 pr-3">Módulo / Tela</th>
+              <th scope="col" className="py-1 pr-3">Funcionalidade</th>
+              <th scope="col" className="py-1 pr-3">Resultado</th>
+              <th scope="col" className="py-1">Observações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {caderno.modulos.flatMap((m) =>
+              telasDoModulo(m.id).flatMap((tela) =>
+                tela.itens.length === 0
+                  ? [
+                      <tr key={tela.id} className="border-b border-slate-200 align-top">
+                        <td className="py-1 pr-3 font-medium">{m.titulo} / {tela.paiId ? "Pop-up: " : ""}{tela.titulo}</td>
+                        <td className="py-1 pr-3" colSpan={3}>Em preparação</td>
+                      </tr>,
+                    ]
+                  : tela.itens.map((i) => {
+                      const r = res(i.id);
+                      return (
+                        <tr key={i.id} className="border-b border-slate-200 align-top">
+                          <td className="py-1 pr-3 font-medium">{m.titulo} / {tela.paiId ? "Pop-up: " : ""}{tela.titulo}</td>
+                          <td className="py-1 pr-3 whitespace-pre-wrap">{i.nome}</td>
+                          <td className="py-1 pr-3 whitespace-nowrap">{OPCOES.find((o) => o.v === r.resultado)!.label}</td>
+                          <td className="py-1 whitespace-pre-wrap">
+                            {r.obs}
+                            {r.anexos.length > 0 && ` (${r.anexos.length} ${r.anexos.length > 1 ? "prints anexados" : "print anexado"})`}
+                          </td>
+                        </tr>
+                      );
+                    }),
+              ),
+            )}
+          </tbody>
+        </table>
       </section>
-    </main>
+    </div>
   );
 }
 
-function Entrada({ titulo, onEntrar }: { titulo: string; onEntrar: (p: Pessoa) => void }) {
+function Entrada({ titulo, onEntrar, focarNome }: { titulo: string; onEntrar: (p: Pessoa) => void; focarNome: boolean }) {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
-  const campo = "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200";
+  const nomeRef = useRef<HTMLInputElement>(null);
+  const campo = "mt-1 w-full rounded-md border border-slate-500 px-3 py-2 text-base focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 sm:text-sm";
+
+  // depois de "Trocar", o botão some: o foco vai para o primeiro campo
+  useEffect(() => {
+    if (focarNome) nomeRef.current?.focus();
+  }, [focarNome]);
+
   return (
     <main className="mx-auto max-w-md px-4 py-10 sm:py-16">
-      <h1 className="text-2xl font-semibold">{titulo}</h1>
-      <p className="mt-2 text-sm text-slate-600">
+      <h1 className="text-balance text-2xl font-semibold">{titulo}</h1>
+      <p className="mt-2 text-sm text-slate-700">
         Para começar, diga quem é você. Assim suas respostas ficam salvas e você pode continuar depois, em qualquer aparelho, com o mesmo e-mail.
       </p>
       <form
@@ -413,31 +750,15 @@ function Entrada({ titulo, onEntrar }: { titulo: string; onEntrar: (p: Pessoa) =
         }}
       >
         <label className="block text-sm font-medium">
-          Seu nome
-          <input required value={nome} onChange={(e) => setNome(e.target.value)} autoComplete="name" className={campo} />
+          Seu nome <span className="font-normal text-slate-600">(obrigatório)</span>
+          <input ref={nomeRef} required value={nome} onChange={(e) => setNome(e.target.value)} autoComplete="name" className={campo} />
         </label>
         <label className="block text-sm font-medium">
-          Seu e-mail
-          <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className={campo} />
+          Seu e-mail <span className="font-normal text-slate-600">(obrigatório)</span>
+          <input required type="email" inputMode="email" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className={campo} />
         </label>
-        <button className="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Começar</button>
+        <button className={`min-h-11 w-full rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>Começar</button>
       </form>
     </main>
-  );
-}
-
-function Imagem({ src, alt, className }: { src: string; alt: string; className: string }) {
-  const janela = useRef<HTMLDialogElement>(null);
-  return (
-    <>
-      <button type="button" onClick={() => janela.current?.showModal()} aria-label="Ampliar imagem" className="block cursor-zoom-in text-left">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} className={className} />
-      </button>
-      <dialog ref={janela} onClick={() => janela.current?.close()} className="m-auto max-h-[92vh] max-w-[92vw] rounded-lg p-2 backdrop:bg-black/70">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} className="max-h-[88vh] max-w-full cursor-zoom-out" />
-      </dialog>
-    </>
   );
 }

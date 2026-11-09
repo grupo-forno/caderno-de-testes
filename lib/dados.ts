@@ -4,6 +4,7 @@ import type { Caderno } from "@/lib/tipos";
 export async function buscarCaderno(slug: string): Promise<{ id: string; caderno: Caderno } | null> {
   const [c] = await sql`select * from cadernos where slug = ${slug}`;
   if (!c) return null;
+  const modulos = await sql`select id, titulo from modulos where caderno_id = ${c.id} order by ordem`;
   const telas = await sql`select * from telas where caderno_id = ${c.id} order by ordem`;
   return {
     id: c.id,
@@ -12,9 +13,18 @@ export async function buscarCaderno(slug: string): Promise<{ id: string; caderno
       versao: c.versao,
       data: new Date(c.atualizado).toLocaleDateString("pt-BR"),
       preparadoPor: c.preparado_por,
-      rodada: c.rodada,
       antesDeComecar: String(c.antes).split("\n").map((s) => s.trim()).filter(Boolean),
-      telas: telas.map((t) => ({ id: t.id, titulo: t.titulo, imagem: t.imagem_url, link: t.link_url, pdf: t.pdf_url ?? (t.itens.length ? `/api/pdf/${t.id}` : null), itens: t.itens, refazer: t.refazer, paiId: t.pai_id })),
+      modulos: modulos.map((m) => ({ id: m.id, titulo: m.titulo })),
+      telas: telas.map((t) => ({
+        id: t.id,
+        moduloId: t.modulo_id,
+        titulo: t.titulo,
+        imagem: t.imagem_url,
+        link: t.link_url,
+        pdf: t.pdf_url ?? (t.itens.length ? `/api/pdf/${t.id}` : null),
+        itens: t.itens,
+        paiId: t.pai_id,
+      })),
     },
   };
 }

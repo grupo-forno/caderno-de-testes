@@ -1,124 +1,314 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
+import AceiteAdmin from "@/components/AceiteAdmin";
 import AdminBar from "@/components/AdminBar";
+import FerramentasPlanilha from "@/components/FerramentasPlanilha";
+import { ChipStatus } from "@/components/StatusBadge";
 import { btn, btn2, campo, Confirmar, CopiarLink } from "@/components/ui";
 import { exigirAdmin } from "@/lib/admin";
+import { consolidado } from "@/lib/consolidado";
 import { sql } from "@/lib/db";
-import { situacao } from "@/lib/rodada";
-import { abrirProximaRodada, alternarRefazer, excluirCaderno, excluirTela, moverTela, salvarCaderno } from "../actions";
+import { dataHora } from "@/lib/formatar";
+import { juntar, resumoTela, type ResumoTela } from "@/lib/status";
+import type { Resultado, Tela } from "@/lib/tipos";
+import { criarModulos, criarTelasEmLote, excluirCaderno, excluirModulo, excluirTela, marcarCorrigido, moverModulo, moverTela, renomearModulo, salvarCaderno } from "../actions";
+import { ROTULO_SEVERIDADE, SEVERIDADES, type Severidade } from "@/lib/tipos";
+
+// mais grave primeiro; sem gravidade informada vai depois
+const pesoSeveridade = (s: Severidade | null) => (s ? SEVERIDADES.indexOf(s) : SEVERIDADES.length);
 
 export const dynamic = "force-dynamic";
+
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+const seta = `min-h-11 min-w-11 rounded border border-slate-400 bg-white px-2 text-sm hover:bg-slate-50 disabled:opacity-30 ${FOCO}`;
+const link = `inline-flex min-h-11 items-center text-sm text-indigo-800 underline ${FOCO}`;
+
+const ERROS: Record<string, string> = {
+  tela: "Esta tela foi excluída em outro lugar, então não foi possível salvar. Confira a lista de telas abaixo.",
+  modulos: "Escreva pelo menos um nome de módulo (um por linha).",
+  modulo_nome: "Escreva o novo nome do módulo.",
+  modulo: "Esse módulo não existe mais. Recarregue a página e confira a lista.",
+  telas: "Escreva pelo menos um nome de tela (um por linha).",
+  item: "Essa funcionalidade não existe mais. Recarregue a página e confira a lista.",
+  travado: "A homologação está concluída, então nada foi alterado ou apagado. Reabra a homologação (caixa “Aceite da homologação”) antes de mudar a estrutura.",
+};
 
 export default async function Page({ params, searchParams }: PageProps<"/admin/[id]">) {
   await exigirAdmin();
   const { id } = await params;
-  const { erro, salvo } = await searchParams;
+  const { erro, salvo, reaberta } = await searchParams;
   const [c] = await sql`select * from cadernos where id::text = ${id}`;
   if (!c) notFound();
-  const telas = await sql`select id, titulo, pai_id, imagem_url, link_url, pdf_url, refazer, jsonb_array_length(itens)::int as n from telas where caderno_id = ${id} order by ordem`;
-  const sit = await situacao(c.slug, c.rodada);
-  // Lista em árvore: cada tela principal seguida dos pop-ups dela
-  const principais = telas.filter((x) => !x.pai_id);
-  const linhas = principais.flatMap((pai, i) => [
-    { t: pai, num: String(i + 1), nivel: 0, pos: i, total: principais.length, filhos: telas.filter((f) => f.pai_id === pai.id).length, paiTitulo: "" },
-    ...telas.filter((f) => f.pai_id === pai.id).map((f, j, arr) => ({ t: f, num: `${i + 1}.${j + 1}`, nivel: 1, pos: j, total: arr.length, filhos: 0, paiTitulo: pai.titulo as string })),
-  ]);
-  const tudoAprovado = telas.length > 0 && telas.every((x) => sit[x.id]?.aprovada);
+  const modulos = await sql`select id, titulo from modulos where caderno_id = ${id} order by ordem`;
+  const rows = await sql`select * from telas where caderno_id = ${id} order by ordem`;
+  const resultados = await consolidado(c.slug);
+  const resultado = (itemId: string): Resultado => resultados[itemId] ?? "nao_testado";
+  const telas: Tela[] = rows.map((x) => ({ id: x.id, moduloId: x.modulo_id, titulo: x.titulo, imagem: x.imagem_url, link: x.link_url, pdf: x.pdf_url, itens: x.itens, paiId: x.pai_id }));
+  const resumos: Record<string, ResumoTela> = Object.fromEntries(telas.map((t) => [t.id, resumoTela(t, resultado)]));
+  const geral = juntar(telas.map((t) => resumos[t.id]));
+
+  // Funcionalidades que existem hoje: nome, tela e módulo (para os alertas)
+  const moduloDe = new Map(modulos.map((m) => [m.id as string, m.titulo as string]));
+  const doItem = new Map<string, { nome: string; tela: string; modulo: string }>();
+  for (const t of telas) for (const i of t.itens) doItem.set(i.id, { nome: i.nome, tela: t.titulo, modulo: moduloDe.get(t.moduloId) ?? "" });
+
+  // Alertas: quem marcou NÃO OK. "Corrigido" = a autora registrou uma correção depois de a pessoa marcar NÃO OK.
+  const alertasBrutos = await sql`
+    select r.item, r.nome, r.obs, r.anexos, r.severidade, r.atualizado,
+      coalesce((select max(h.criado) from historico h where h.caderno = r.caderno and h.item = r.item and h.email = r.email and h.tipo = 'resultado' and h.para = 'nao_ok'), r.atualizado) as marcou_em
+    from respostas_item r
+    where r.caderno = ${c.slug} and r.resultado = 'nao_ok'`;
+  const corrigidos = await sql`select item, max(criado) as em from historico where caderno = ${c.slug} and tipo = 'correcao' group by item`;
+  const ultimaCorrecao = new Map(corrigidos.map((x) => [x.item as string, new Date(x.em).getTime()]));
+  const alertas = alertasBrutos
+    .filter((a) => doItem.has(a.item))
+    .map((a) => ({
+      item: a.item as string,
+      nome: a.nome as string,
+      obs: a.obs as string,
+      anexos: (a.anexos ?? []) as string[],
+      severidade: (a.severidade ?? null) as Severidade | null,
+      marcouEm: new Date(a.marcou_em),
+      // só vale como "corrigido" se a correção veio DEPOIS da última mudança da pessoa (inclusive uma observação
+      // nova depois do reteste: "continua com problema" volta o alerta para "aguardando correção")
+      corrigido: (ultimaCorrecao.get(a.item) ?? 0) > new Date(a.atualizado).getTime(),
+    }))
+    .sort((a, b) => Number(a.corrigido) - Number(b.corrigido) || pesoSeveridade(a.severidade) - pesoSeveridade(b.severidade) || a.marcouEm.getTime() - b.marcouEm.getTime());
+  const aguardando = alertas.filter((a) => !a.corrigido).length;
+
   const h = await headers();
-  const url = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}/c/${c.slug}`;
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const url = host ? `${h.get("x-forwarded-proto") ?? "http"}://${host}/c/${c.slug}` : null; // sem endereço, não mostra link quebrado
 
   return (
     <>
       <AdminBar />
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <Link href="/admin" className="text-sm text-indigo-700 hover:underline">← Todos os cadernos</Link>
+        <Link href="/admin" className="text-sm text-indigo-800 hover:underline">← Todos os cadernos</Link>
         <h1 className="mt-2 text-2xl font-semibold">{c.titulo}</h1>
-        {salvo && <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Salvo.</p>}
+        {salvo && <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">Salvo.</p>}
+        {typeof erro === "string" && ERROS[erro] && <p role="alert" className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">{ERROS[erro]}</p>}
 
         <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
           <h2 className="font-semibold">Link para o cliente</h2>
-          <p className="mt-1 text-sm text-slate-600">Quem tiver este link abre o caderno. Envie para o cliente.</p>
-          <div className="mt-3"><CopiarLink url={url} /></div>
-          <div className="mt-3 flex gap-2">
-            <a href={`/c/${c.slug}`} target="_blank" className={btn2}>Ver como o cliente vê</a>
-            <Link href={`/admin/${id}/respostas`} className={btn2}>Ver respostas</Link>
+          <p className="mt-1 text-sm text-slate-700">Quem tiver este link abre o caderno inteiro, com todos os módulos. Envie para o cliente.</p>
+          <div className="mt-3">
+            {url ? <CopiarLink url={url} /> : <p className="text-sm text-rose-800">Não conseguimos montar o endereço completo. Use o botão “Ver como o cliente vê” e copie o endereço da barra do navegador.</p>}
           </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a href={`/c/${c.slug}`} target="_blank" className={btn2 + " inline-flex min-h-11 items-center"}>Ver como o cliente vê<span className="sr-only"> (abre em nova aba)</span></a>
+            <Link href={`/admin/${id}/respostas`} className={btn2 + " inline-flex min-h-11 items-center"}>Ver respostas</Link>
+            <Link href={`/admin/${id}/historico`} className={btn2 + " inline-flex min-h-11 items-center"}>Ver histórico</Link>
+          </div>
+          <FerramentasPlanilha cadernoId={id} />
         </section>
 
-        <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
-          <h2 className="font-semibold">Rodada {c.rodada}</h2>
-          {tudoAprovado ? (
-            <p className="mt-1 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Todas as telas estão aprovadas. Este caderno está concluído.</p>
-          ) : (
-            <>
-              <p className="mt-1 text-sm text-slate-600">
-                Quando o cliente terminar, abra a próxima rodada. As telas aprovadas (pelo menos um OK e nenhum NÃO OK) ficam recolhidas, e as outras voltam para teste, no topo.
-              </p>
-              <form action={abrirProximaRodada.bind(null, id)} className="mt-3">
-                <Confirmar className={btn} texto={`Abrir a rodada ${c.rodada + 1}? As telas aprovadas ficam recolhidas para o cliente e as demais voltam para teste. Não dá para voltar atrás.`}>
-                  Abrir rodada {c.rodada + 1}
-                </Confirmar>
-              </form>
-            </>
-          )}
-        </section>
+        <AceiteAdmin cadernoId={id} slug={c.slug} erro={typeof erro === "string" ? erro : undefined} reaberta={reaberta === "1"} />
 
-        <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Telas ({telas.length})</h2>
-            <Link href={`/admin/${id}/tela/nova`} className={btn}>Adicionar tela</Link>
-          </div>
-          {telas.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-600">Nenhuma tela ainda. Clique em “Adicionar tela” para começar.</p>
-          ) : (
-            <ul className="mt-3 divide-y divide-slate-100">
-              {linhas.map(({ t, num, nivel, pos, total, filhos, paiTitulo }) => (
-                <li key={t.id} className={`flex flex-wrap items-center gap-3 py-3 ${nivel ? "ml-6 border-l-2 border-indigo-200 pl-4 sm:ml-10" : ""}`}>
-                  <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-100 px-1.5 text-sm font-medium">{num}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">
-                      {nivel > 0 && <span className="mr-2 rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-semibold text-indigo-800">Pop-up de “{paiTitulo}”</span>}
-                      {t.titulo}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {t.imagem_url ? "Imagem ✓" : "Sem imagem"} · {t.pdf_url ? "PDF ✓" : t.n > 0 ? "PDF gerado pela lista" : "Sem PDF"} · {t.link_url ? "Link ✓" : "Sem link"} · {t.n} {t.n === 1 ? "item" : "itens"}
-                    </p>
-                    <p className="text-xs">
-                      {!t.refazer && <span className="mr-2 rounded bg-emerald-100 px-1.5 py-0.5 font-semibold text-emerald-800">Aprovada antes</span>}
-                      <span className="text-slate-500">
-                        Rodada {c.rodada}: {sit[t.id] ? `${sit[t.id].ok} OK · ${sit[t.id].naoOk} NÃO OK · ${sit[t.id].naoTestado} NÃO TESTADO` : "sem respostas"}
-                      </span>
-                    </p>
+        {alertas.length > 0 && (
+          <section aria-labelledby="titulo-alertas" className="mt-6 rounded-lg border border-rose-300 bg-rose-50 p-5">
+            <h2 id="titulo-alertas" className="font-semibold text-rose-950">Para corrigir ({alertas.length})</h2>
+            <p className="mt-1 text-sm text-rose-950">
+              {aguardando > 0 ? `${aguardando} ${aguardando === 1 ? "aguarda" : "aguardam"} correção.` : "Tudo já foi corrigido e aguarda o reteste do cliente."} Depois de ajustar, clique em “Marcar como corrigido”: o cliente vê o aviso, testa de novo e o registro fica no histórico.
+            </p>
+            <ul className="mt-4 space-y-3">
+              {alertas.map((a) => (
+                <li key={`${a.item}-${a.nome}`} className="rounded-lg border border-rose-200 bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="whitespace-pre-wrap font-medium">{doItem.get(a.item)!.nome}</p>
+                      {a.severidade && <p className="mt-0.5 text-xs font-semibold text-rose-900">Gravidade: {ROTULO_SEVERIDADE[a.severidade]}</p>}
+                      <p className="text-xs text-slate-700">
+                        {doItem.get(a.item)!.modulo} › {doItem.get(a.item)!.tela} · marcado por {a.nome} em {dataHora(a.marcouEm)}
+                      </p>
+                    </div>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${a.corrigido ? "bg-amber-100 text-amber-900 ring-amber-300" : "bg-rose-100 text-rose-900 ring-rose-300"}`}>
+                      {a.corrigido ? "Corrigido, aguardando reteste do cliente" : "Aguardando correção"}
+                    </span>
                   </div>
-                  <form action={moverTela.bind(null, id, t.id, -1)}><button disabled={pos === 0} aria-label="Subir" className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-30">↑</button></form>
-                  <form action={moverTela.bind(null, id, t.id, 1)}><button disabled={pos === total - 1} aria-label="Descer" className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-30">↓</button></form>
-                  {c.rodada > 1 && (
-                    <form action={alternarRefazer.bind(null, id, t.id)}>
-                      <button className="text-sm text-slate-600 underline">{t.refazer ? "Marcar como aprovada" : "Voltar para teste"}</button>
-                    </form>
+                  {a.obs && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">{a.obs}</p>}
+                  {a.anexos.length > 0 && (
+                    <ul className="mt-2 flex flex-wrap gap-2">
+                      {a.anexos.map((u, k) => (
+                        <li key={u}>
+                          <a href={u} target="_blank" rel="noreferrer" aria-label={`Abrir print ${k + 1} em nova aba`} className={`block rounded-md ${FOCO}`}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={u} alt={`Print ${k + 1} anexado pelo cliente`} className="h-20 w-28 rounded-md border border-slate-200 object-cover" />
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                  {nivel === 0 && <Link href={`/admin/${id}/tela/nova?pai=${t.id}`} className="text-sm text-indigo-700 underline">Adicionar pop-up</Link>}
-                  <Link href={`/admin/${id}/tela/${t.id}`} className={btn2}>Editar</Link>
-                  <form action={excluirTela.bind(null, id, t.id)}><Confirmar texto={`Excluir ${nivel ? "o pop-up" : "a tela"} “${t.titulo}”${filhos ? ` e os ${filhos} pop-ups dela` : ""}? Não dá para desfazer.`}>Excluir</Confirmar></form>
+                  <form action={marcarCorrigido.bind(null, id, a.item)} className="mt-3 flex flex-wrap items-end gap-2">
+                    <label className="min-w-0 flex-1 text-xs font-medium text-slate-700">
+                      O que foi ajustado (opcional)
+                      <input name="nota" maxLength={2000} placeholder="Ex.: o botão agora aparece na tela" className={campo + " min-h-11"} />
+                    </label>
+                    <button className={btn + " min-h-11"}>{a.corrigido ? "Registrar nova correção" : "Marcar como corrigido"}</button>
+                  </form>
+                  <Link href={`/admin/${id}/historico?item=${a.item}`} className={link}>Ver histórico desta funcionalidade</Link>
                 </li>
               ))}
             </ul>
+          </section>
+        )}
+
+        <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Módulos e telas</h2>
+            <ChipStatus status={geral.status} />
+          </div>
+          <p className="mt-1 text-sm text-slate-700">
+            {geral.total === 0
+              ? "Ainda não há funcionalidades cadastradas."
+              : `${geral.ok} de ${geral.total} funcionalidades OK${geral.naoOk > 0 ? ` · ${geral.naoOk} NÃO OK` : ""}.`}{" "}
+            Dá para cadastrar todos os módulos e telas de uma vez, só com o nome. Eles aparecem no menu do cliente como “Em preparação” até você cadastrar as funcionalidades de cada tela.
+          </p>
+
+          <details className="mt-4 rounded-md border border-slate-300 bg-slate-50" open={modulos.length === 0}>
+            <summary className={`flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm font-medium ${FOCO}`}>Adicionar módulos</summary>
+            <form action={criarModulos.bind(null, id)} className="space-y-3 border-t border-slate-200 p-3">
+              <label className="block text-sm font-medium">
+                Um módulo por linha
+                <textarea name="titulos" rows={4} required placeholder={"Menu inicial\nFinanceiro\nRH\nCompras\nEstoque"} className={campo} />
+              </label>
+              <button className={btn + " min-h-11"}>Criar módulos</button>
+            </form>
+          </details>
+
+          {modulos.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-700">Nenhum módulo ainda. Crie os módulos acima para começar a cadastrar as telas.</p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {modulos.map((m, mi) => {
+                const doModulo = telas.filter((t) => t.moduloId === m.id);
+                const principais = doModulo.filter((t) => !t.paiId);
+                const rm = juntar(doModulo.map((t) => resumos[t.id]));
+                const nPop = doModulo.length - principais.length;
+                return (
+                  <article key={m.id} aria-labelledby={`m-${m.id}`} className="rounded-lg border border-slate-300">
+                    <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-lg bg-slate-50 px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <h3 id={`m-${m.id}`} className="break-words text-base font-semibold">
+                          <span className="mr-2 text-slate-600">{mi + 1}.</span>
+                          {m.titulo}
+                        </h3>
+                        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-700">
+                          <ChipStatus status={rm.status} />
+                          <span>
+                            {principais.length} {principais.length === 1 ? "tela" : "telas"}
+                            {nPop > 0 ? ` e ${nPop} ${nPop === 1 ? "pop-up" : "pop-ups"}` : ""}
+                            {rm.total > 0 ? ` · ${rm.ok} de ${rm.total} funcionalidades OK` : ""}
+                            {rm.naoOk > 0 && <strong className="text-rose-800"> · {rm.naoOk} NÃO OK</strong>}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <form action={moverModulo.bind(null, id, m.id, -1)}><button disabled={mi === 0} aria-label={`Subir o módulo ${m.titulo}`} className={seta}>↑</button></form>
+                        <form action={moverModulo.bind(null, id, m.id, 1)}><button disabled={mi === modulos.length - 1} aria-label={`Descer o módulo ${m.titulo}`} className={seta}>↓</button></form>
+                        <Link href={`/admin/${id}/tela/nova?modulo=${m.id}`} className={btn + " inline-flex min-h-11 items-center"}>Adicionar tela</Link>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 px-4 py-3">
+                      {principais.length === 0 ? (
+                        <p className="text-sm text-slate-700">Nenhuma tela neste módulo ainda.</p>
+                      ) : (
+                        <ul className="divide-y divide-slate-100">
+                          {principais.flatMap((t, ti) => {
+                            const filhos = doModulo.filter((f) => f.paiId === t.id);
+                            return [
+                              { t, num: String(ti + 1), nivel: 0, pos: ti, total: principais.length, filhos: filhos.length, paiTitulo: "" },
+                              ...filhos.map((f, fi) => ({ t: f, num: `${ti + 1}.${fi + 1}`, nivel: 1, pos: fi, total: filhos.length, filhos: 0, paiTitulo: t.titulo })),
+                            ];
+                          }).map(({ t, num, nivel, pos, total, filhos, paiTitulo }) => {
+                            const r = resumos[t.id];
+                            return (
+                              <li key={t.id} className={`flex flex-wrap items-center gap-3 py-3 ${nivel ? "ml-6 border-l-2 border-indigo-200 pl-4 sm:ml-10" : ""}`}>
+                                <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-100 px-1.5 text-sm font-medium">{num}</span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium">
+                                    {nivel > 0 && <span className="mr-2 rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-semibold text-indigo-900">Pop-up de “{paiTitulo}”</span>}
+                                    {t.titulo}
+                                  </p>
+                                  <p className="text-xs text-slate-600">
+                                    {t.imagem ? "Imagem ✓" : "Sem imagem"} · {t.pdf ? "PDF ✓" : t.itens.length > 0 ? "PDF gerado pela lista" : "Sem PDF"} · {t.link ? "Link ✓" : "Sem link"} · {t.itens.length} {t.itens.length === 1 ? "funcionalidade" : "funcionalidades"}
+                                  </p>
+                                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-700">
+                                    <ChipStatus status={r.status} />
+                                    {r.total > 0 && (
+                                      <span>
+                                        {r.ok} de {r.total} OK
+                                        {r.naoOk > 0 && <strong className="text-rose-800"> · {r.naoOk} NÃO OK</strong>}
+                                      </span>
+                                    )}
+                                  </p>
+                                </div>
+                                <form action={moverTela.bind(null, id, t.id, -1)}><button disabled={pos === 0} aria-label={`Subir ${t.titulo}`} className={seta}>↑</button></form>
+                                <form action={moverTela.bind(null, id, t.id, 1)}><button disabled={pos === total - 1} aria-label={`Descer ${t.titulo}`} className={seta}>↓</button></form>
+                                {nivel === 0 && <Link href={`/admin/${id}/tela/nova?pai=${t.id}`} className={link}>Adicionar pop-up</Link>}
+                                <Link href={`/admin/${id}/tela/${t.id}`} className={btn2 + " inline-flex min-h-11 items-center"}>Editar<span className="sr-only"> {t.titulo}</span></Link>
+                                <form action={excluirTela.bind(null, id, t.id)}>
+                                  <Confirmar texto={`Excluir ${nivel ? "o pop-up" : "a tela"} “${t.titulo}”${filhos ? ` e os ${filhos} pop-ups dela` : ""}? Não dá para desfazer. As respostas dos clientes às funcionalidades ${filhos ? "dessas telas" : "dela"} continuam guardadas e passam a aparecer em “Respostas de funcionalidades removidas”.`} className={btn2 + " min-h-11"}>
+                                    Excluir<span className="sr-only"> {t.titulo}</span>
+                                  </Confirmar>
+                                </form>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+
+                      <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-3">
+                        <details className="min-w-0 flex-1 basis-64 rounded-md border border-slate-300">
+                          <summary className={`flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm font-medium ${FOCO}`}>Criar várias telas de uma vez</summary>
+                          <form action={criarTelasEmLote.bind(null, id, m.id)} className="space-y-3 border-t border-slate-200 p-3">
+                            <label className="block text-sm font-medium">
+                              Uma tela por linha (só o nome)
+                              <textarea name="titulos" rows={4} required placeholder={"Relatório de pedidos\nCadastro de clientes"} className={campo} />
+                            </label>
+                            <button className={btn + " min-h-11"}>Criar telas</button>
+                          </form>
+                        </details>
+                        <details className="min-w-0 flex-1 basis-64 rounded-md border border-slate-300">
+                          <summary className={`flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm font-medium ${FOCO}`}>Renomear ou excluir o módulo</summary>
+                          <div className="space-y-3 border-t border-slate-200 p-3">
+                            <form action={renomearModulo.bind(null, id, m.id)} className="flex flex-wrap items-end gap-2">
+                              <label className="min-w-0 flex-1 text-sm font-medium">
+                                Novo nome
+                                <input name="titulo" required defaultValue={m.titulo} className={campo + " min-h-11"} />
+                              </label>
+                              <button className={btn2 + " min-h-11"}>Renomear</button>
+                            </form>
+                            <form action={excluirModulo.bind(null, id, m.id)}>
+                              <Confirmar texto={`Excluir o módulo “${m.titulo}”, com as ${doModulo.length} telas e pop-ups dele, e também as respostas e o histórico dos clientes dessas telas? Não dá para desfazer.`} className={btn2 + " min-h-11 text-rose-800"}>
+                                Excluir módulo e tudo dentro dele
+                              </Confirmar>
+                            </form>
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           )}
         </section>
 
         <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
           <h2 className="font-semibold">Dados do caderno</h2>
           <form action={salvarCaderno.bind(null, id)} className="mt-3 grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm font-medium sm:col-span-2">Nome<input name="titulo" required defaultValue={c.titulo} className={campo} /></label>
-            {erro === "titulo" && <p role="alert" className="text-sm text-rose-700 sm:col-span-2">Escreva o nome do caderno.</p>}
+            <label className="block text-sm font-medium sm:col-span-2">Nome do sistema<input name="titulo" required defaultValue={c.titulo} className={campo} /></label>
+            {erro === "titulo" && <p role="alert" className="text-sm text-rose-800 sm:col-span-2">Escreva o nome do caderno.</p>}
             <label className="block text-sm font-medium">Versão<input name="versao" defaultValue={c.versao} className={campo} /></label>
             <label className="block text-sm font-medium">Preparado por<input name="preparado_por" defaultValue={c.preparado_por} className={campo} /></label>
             <label className="block text-sm font-medium sm:col-span-2">Antes de começar (um item por linha)<textarea name="antes" rows={3} defaultValue={c.antes} className={campo} /></label>
-            <div className="sm:col-span-2"><button className={btn}>Salvar</button></div>
+            <div className="sm:col-span-2"><button className={btn + " min-h-11"}>Salvar</button></div>
           </form>
           <form action={excluirCaderno.bind(null, id)} className="mt-6 border-t border-slate-100 pt-4">
-            <Confirmar texto="Excluir este caderno inteiro, com as telas e as respostas dos clientes? Não dá para desfazer.">Excluir caderno</Confirmar>
+            <Confirmar texto="Excluir este caderno inteiro, com os módulos, as telas, as respostas dos clientes e o histórico? Não dá para desfazer." className={btn2 + " min-h-11"}>Excluir caderno</Confirmar>
           </form>
         </section>
       </main>

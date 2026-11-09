@@ -4,9 +4,9 @@ import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { btn, btn2, campo } from "@/components/ui";
 
-type Item = { nome: string; faz: string; imagem?: string };
+type Item = { id?: string; nome: string; faz: string; imagem?: string };
 type ItemLocal = Item & { k: number }; // k só serve para o React não misturar os itens ao remover um
-type Inicial = { titulo: string; imagem: string | null; link: string | null; pdf: string | null; itens: Item[]; paiId: string | null };
+type Inicial = { titulo: string; imagem: string | null; link: string | null; pdf: string | null; itens: Item[]; paiId: string | null; moduloId: string };
 
 function Arquivo({ nome, rotulo, substantivo, accept, limiteMb, inicial }: { nome: string; rotulo: string; substantivo: string; accept: string; limiteMb: number; inicial: string | null }) {
   const [url, setUrl] = useState(inicial ?? "");
@@ -90,17 +90,21 @@ const novoItem = (i?: Item): ItemLocal => ({ nome: "", faz: "", ...i, k: proxK++
 const MENSAGEM_ERRO: Record<string, string> = {
   titulo: "Escreva o nome da tela.",
   pai: "Não foi possível ligar este pop-up à tela escolhida. Escolha outra tela principal.",
+  modulo: "Escolha o módulo da tela. Se ainda não existe nenhum, volte ao caderno e crie os módulos primeiro.",
+  url: "Um dos endereços não é aceito. O link da tela deve começar com https:// e as imagens e PDFs devem ser enviados pelo botão “Escolher”, não colados.",
 };
 
 export default function TelaForm({
-  acao, inicial, erro, principais, temFilhos,
+  acao, inicial, erro, principais, temFilhos, modulos,
 }: {
   acao: (f: FormData) => void;
   inicial: Inicial;
   erro?: string;
   principais: { id: string; titulo: string }[];
   temFilhos: boolean;
+  modulos: { id: string; titulo: string }[];
 }) {
+  const [modulo, setModulo] = useState(inicial.moduloId || modulos[0]?.id || "");
   const [itens, setItens] = useState<ItemLocal[]>(() => (inicial.itens.length ? inicial.itens.map((i) => novoItem(i)) : [novoItem()]));
   const [ehPopup, setEhPopup] = useState(!!inicial.paiId);
   const [pai, setPai] = useState(inicial.paiId ?? principais[0]?.id ?? "");
@@ -116,6 +120,16 @@ export default function TelaForm({
         <input name="titulo" required defaultValue={inicial.titulo} placeholder="Ex.: Lista de cadastros" className={campo} />
       </label>
       {erro && MENSAGEM_ERRO[erro] && <p role="alert" className="text-sm text-rose-700">{MENSAGEM_ERRO[erro]}</p>}
+
+      {!ehPopup && (
+        <label className="block text-sm font-medium">
+          Em qual módulo está esta tela?
+          <select name="modulo_id" required value={modulo} onChange={(e) => setModulo(e.target.value)} className={campo + " min-h-11"}>
+            {modulos.length === 0 && <option value="">Nenhum módulo criado ainda</option>}
+            {modulos.map((m) => <option key={m.id} value={m.id}>{m.titulo}</option>)}
+          </select>
+        </label>
+      )}
 
       <fieldset>
         <legend className="text-sm font-medium">Que tipo de tela é essa?</legend>
@@ -136,7 +150,7 @@ export default function TelaForm({
             <select name="pai_id" required value={pai} onChange={(e) => setPai(e.target.value)} className={campo}>
               {principais.map((p) => <option key={p.id} value={p.id}>{p.titulo}</option>)}
             </select>
-            <span className="mt-1 block text-xs font-normal text-slate-600">O pop-up aparece dentro do cartão dessa tela, para o cliente ver que um pertence ao outro.</span>
+            <span className="mt-1 block text-xs font-normal text-slate-600">O pop-up fica no mesmo módulo da tela escolhida e aparece junto dela, para o cliente ver que um pertence ao outro.</span>
           </label>
         )}
       </fieldset>
@@ -162,11 +176,12 @@ export default function TelaForm({
       <fieldset>
         <legend className="text-sm font-medium">O que cada item da tela faz</legend>
         <p className="text-xs text-slate-600">
-          Campo, botão ou qualquer elemento, e o que acontece quando a pessoa usa. Aparece para o cliente na página e é com isso que o PDF das funcionalidades é gerado sozinho. Se um item abre um pop-up ou muda a tela, dá para juntar uma imagem a ele.
+          Cada item é uma funcionalidade (campo, botão, área...) e o que acontece quando a pessoa usa. O cliente dá um resultado para cada uma (OK, NÃO OK ou NÃO TESTADO), e é com esta lista que o PDF das funcionalidades é gerado sozinho. Se um item abre um pop-up ou muda a tela, dá para juntar uma imagem a ele. Pode deixar a lista vazia por enquanto: a tela aparece no menu como “Em preparação” até você cadastrar as funcionalidades.
         </p>
         <div className="mt-3 space-y-3">
           {itens.map((it) => (
             <div key={it.k} className="grid gap-3 rounded-md border border-slate-200 bg-white p-3 sm:grid-cols-[1fr_2fr_auto]">
+              <input type="hidden" name="itemId" value={it.id ?? ""} />
               <label className="block text-xs font-medium text-slate-600">
                 Item (botão, campo, área…)
                 <textarea name="itemNome" rows={2} value={it.nome} onChange={(e) => mudar(it.k, { nome: e.target.value })} placeholder="Ex.: Botão Salvar, Campo Nome, Área de filtros" className={campo + " field-sizing-content min-h-14 resize-y text-slate-900"} />

@@ -3,87 +3,131 @@ import { notFound } from "next/navigation";
 import AdminBar from "@/components/AdminBar";
 import { exigirAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
+import { COR_RESULTADO, ROTULO_RESULTADO } from "@/lib/formatar";
 
 export const dynamic = "force-dynamic";
 
-const ROTULO: Record<string, string> = { ok: "OK", nao_ok: "NÃO OK", nao_testado: "NÃO TESTADO" };
-const COR: Record<string, string> = {
-  ok: "bg-emerald-100 text-emerald-800",
-  nao_ok: "bg-rose-100 text-rose-800",
-  nao_testado: "bg-slate-200 text-slate-700",
-};
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
 
-export default async function Page({ params, searchParams }: PageProps<"/admin/[id]/respostas">) {
+export default async function Page({ params }: PageProps<"/admin/[id]/respostas">) {
   await exigirAdmin();
   const { id } = await params;
-  const { rodada: rq } = await searchParams;
-  const [c] = await sql`select slug, titulo, rodada from cadernos where id::text = ${id}`;
+  const [c] = await sql`select slug, titulo from cadernos where id::text = ${id}`;
   if (!c) notFound();
-  const rodada = Math.min(Math.max(Number(rq) || c.rodada, 1), c.rodada);
-  const todas = await sql`select id, titulo, pai_id from telas where caderno_id = ${id} order by ordem`;
-  // cada tela principal seguida dos pop-ups dela
-  const telas = todas.filter((t) => !t.pai_id).flatMap((t) => [t, ...todas.filter((f) => f.pai_id === t.id)]);
-  const rs = await sql`select nome, email, tela, resultado, obs, anexos, atualizado from respostas where caderno = ${c.slug} and rodada = ${rodada} order by nome, email`;
+  const modulos = await sql`select id, titulo from modulos where caderno_id = ${id} order by ordem`;
+  const todas = await sql`select id, titulo, modulo_id, pai_id, itens from telas where caderno_id = ${id} order by ordem`;
+  const rs = await sql`select nome, email, item, resultado, obs, anexos from respostas_item where caderno = ${c.slug} order by nome, email`;
 
-  const pessoas = new Map<string, { nome: string; email: string; porTela: Map<string, (typeof rs)[number]> }>();
+  // por pessoa: resposta de cada funcionalidade (pela chave do item)
+  const pessoas = new Map<string, { nome: string; email: string; porItem: Map<string, (typeof rs)[number]> }>();
   for (const r of rs) {
-    if (!pessoas.has(r.email)) pessoas.set(r.email, { nome: r.nome, email: r.email, porTela: new Map() });
-    pessoas.get(r.email)!.porTela.set(r.tela, r);
+    if (!pessoas.has(r.email)) pessoas.set(r.email, { nome: r.nome, email: r.email, porItem: new Map() });
+    pessoas.get(r.email)!.porItem.set(r.item, r);
   }
+
+  // cada módulo com suas telas (principal seguida dos pop-ups). Tela sem funcionalidades não tem o que mostrar.
+  const arvore = modulos
+    .map((m) => {
+      const doModulo = todas.filter((t) => t.modulo_id === m.id);
+      const telas = doModulo.filter((t) => !t.pai_id).flatMap((t) => [t, ...doModulo.filter((f) => f.pai_id === t.id)]).filter((t) => (t.itens as unknown[]).length > 0);
+      return { modulo: m, telas };
+    })
+    .filter((g) => g.telas.length > 0);
+  const validos = new Set(todas.flatMap((t) => (t.itens as { id: string }[]).map((i) => i.id)));
 
   return (
     <>
       <AdminBar />
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <Link href={`/admin/${id}`} className="text-sm text-indigo-700 hover:underline">← Voltar ao caderno</Link>
+        <Link href={`/admin/${id}`} className="text-sm text-indigo-800 hover:underline">← Voltar ao caderno</Link>
         <h1 className="mt-2 text-2xl font-semibold">Respostas: {c.titulo}</h1>
-        {c.rodada > 1 && (
-          <nav aria-label="Rodadas" className="mt-3 flex flex-wrap gap-2 text-sm">
-            {Array.from({ length: c.rodada }, (_, i) => i + 1).map((n) => (
-              <Link key={n} href={`/admin/${id}/respostas?rodada=${n}`} className={`rounded-md border px-3 py-1 ${n === rodada ? "border-indigo-600 bg-indigo-50 font-medium text-indigo-800" : "border-slate-300 hover:bg-slate-50"}`}>
-                Rodada {n}
-              </Link>
-            ))}
-          </nav>
-        )}
+        <Link href={`/admin/${id}/historico`} className={`inline-flex min-h-11 items-center text-sm text-indigo-800 underline ${FOCO}`}>Ver o histórico de mudanças</Link>
 
         {pessoas.size === 0 ? (
-          <p className="mt-4 text-sm text-slate-600">Ninguém respondeu nesta rodada ainda. Quando o cliente começar, as respostas aparecem aqui.</p>
+          <p className="mt-4 text-sm text-slate-700">Ninguém respondeu ainda. Quando o cliente começar, as respostas aparecem aqui.</p>
         ) : (
-          [...pessoas.values()].map((p) => (
-            <section key={p.email} className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
-              <h2 className="font-semibold">{p.nome} <span className="text-sm font-normal text-slate-600">{p.email}</span></h2>
-              <ul className="mt-3 divide-y divide-slate-100">
-                {telas.map((t) => {
-                  const r = p.porTela.get(t.id);
-                  const res = r?.resultado ?? "nao_testado";
-                  return (
-                    <li key={t.id} className="py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className={t.pai_id ? "ml-5 font-medium" : "font-medium"}>{t.pai_id && "↳ Pop-up: "}{t.titulo}</span>
-                        <span className={`rounded px-2 py-0.5 text-xs font-semibold ${COR[res]}`}>{ROTULO[res]}</span>
+          [...pessoas.values()].map((p) => {
+            const removidas = [...p.porItem.values()].filter((r) => !validos.has(r.item));
+            return (
+              <section key={p.email} className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
+                <h2 className="font-semibold">{p.nome} <span className="text-sm font-normal text-slate-700">{p.email}</span></h2>
+                <div className="mt-3 space-y-6">
+                  {arvore.map(({ modulo, telas }) => (
+                    <div key={modulo.id}>
+                      <h3 className="border-b border-slate-200 pb-1 text-base font-semibold">{modulo.titulo}</h3>
+                      <div className="mt-3 space-y-5">
+                        {telas.map((t) => (
+                          <div key={t.id} className={t.pai_id ? "ml-5 border-l-2 border-indigo-200 pl-4" : ""}>
+                            <h4 className="text-sm font-semibold text-slate-900">
+                              {t.pai_id && <span className="mr-2 rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-semibold text-indigo-900">Pop-up</span>}
+                              {t.titulo}
+                            </h4>
+                            <ul className="mt-1 divide-y divide-slate-100">
+                              {(t.itens as { id: string; nome: string }[]).map((it) => {
+                                const r = p.porItem.get(it.id);
+                                const res = r?.resultado ?? "nao_testado";
+                                return (
+                                  <li key={it.id} className="py-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <span className="whitespace-pre-wrap text-sm font-medium">{it.nome}</span>
+                                      <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${COR_RESULTADO[res]}`}>{ROTULO_RESULTADO[res]}</span>
+                                    </div>
+                                    {r?.obs && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{r.obs}</p>}
+                                    {r && <Anexos anexos={r.anexos} />}
+                                    {r && (
+                                      <Link href={`/admin/${id}/historico?item=${it.id}`} className={`inline-flex min-h-11 items-center text-xs text-indigo-800 underline ${FOCO}`}>
+                                        Ver histórico
+                                      </Link>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        ))}
                       </div>
-                      {r?.obs && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{r.obs}</p>}
-                      {r && r.anexos.length > 0 && (
-                        <ul className="mt-2 flex flex-wrap gap-2">
-                          {(r.anexos as string[]).map((u) => (
-                            <li key={u}>
-                              <a href={u} target="_blank" rel="noreferrer">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={u} alt="Print anexado pelo cliente" className="h-20 w-28 rounded-md border border-slate-200 object-cover" />
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))
+                    </div>
+                  ))}
+                  {removidas.length > 0 && (
+                    <div className="border-t border-slate-200 pt-4">
+                      <h3 className="text-sm font-semibold text-slate-900">Respostas de funcionalidades removidas</h3>
+                      <p className="text-xs text-slate-700">Estas funcionalidades foram excluídas da tela depois de respondidas. As respostas continuam guardadas aqui.</p>
+                      <ul className="mt-1 divide-y divide-slate-100">
+                        {removidas.map((r) => (
+                          <li key={r.item} className="py-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="text-sm font-medium">Funcionalidade removida</span>
+                              <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${COR_RESULTADO[r.resultado]}`}>{ROTULO_RESULTADO[r.resultado]}</span>
+                            </div>
+                            {r.obs && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{r.obs}</p>}
+                            <Anexos anexos={r.anexos} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </section>
+            );
+          })
         )}
       </main>
     </>
+  );
+}
+
+function Anexos({ anexos }: { anexos: string[] }) {
+  if (!anexos?.length) return null;
+  return (
+    <ul className="mt-2 flex flex-wrap gap-2">
+      {anexos.map((u, k) => (
+        <li key={u}>
+          <a href={u} target="_blank" rel="noreferrer" aria-label={`Abrir print ${k + 1} em nova aba`} className={`block rounded-md ${FOCO}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={u} alt={`Print ${k + 1} anexado pelo cliente`} className="h-20 w-28 rounded-md border border-slate-200 object-cover" />
+          </a>
+        </li>
+      ))}
+    </ul>
   );
 }

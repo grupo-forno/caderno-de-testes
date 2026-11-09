@@ -4,6 +4,19 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+/* a barra fixa do celular não pode cobrir o campo que recebe o foco */
+html {
+  scroll-padding-top: 5.5rem;
+}
+
+/* sem o atraso de toque no celular */
+button,
+a,
+label,
+summary {
+  touch-action: manipulation;
+}
+
 @media print {
   .no-print { display: none !important; }
   details > * { display: block; }

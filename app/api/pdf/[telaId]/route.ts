@@ -28,7 +28,7 @@ const limpar = (s: string) =>
 export async function GET(_req: Request, { params }: { params: Promise<{ telaId: string }> }) {
   const { telaId } = await params;
   if (!/^[0-9a-f-]{36}$/.test(telaId)) return new Response("Tela não encontrada.", { status: 404 });
-  const [t] = await sql`select t.titulo, t.imagem_url, t.itens, c.titulo as caderno, c.versao, p.titulo as pai from telas t join cadernos c on c.id = t.caderno_id left join telas p on p.id = t.pai_id where t.id = ${telaId}`;
+  const [t] = await sql`select t.titulo, t.imagem_url, t.itens, c.titulo as caderno, c.versao, p.titulo as pai, m.titulo as modulo from telas t join cadernos c on c.id = t.caderno_id left join telas p on p.id = t.pai_id left join modulos m on m.id = t.modulo_id where t.id = ${telaId}`;
   if (!t) return new Response("Tela não encontrada.", { status: 404 });
 
   const doc = await PDFDocument.create();
@@ -62,7 +62,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ telaId:
     }
   };
 
-  texto(`${t.caderno} · versão ${t.versao}`, normal, 10, rgb(0.4, 0.4, 0.5));
+  texto(`${t.caderno}${t.modulo ? ` · ${t.modulo}` : ""} · versão ${t.versao}`, normal, 10, rgb(0.4, 0.4, 0.5));
   if (t.pai) texto(`Pop-up da tela: ${t.pai}`, negrito, 11, rgb(0.3, 0.25, 0.7));
   y -= 4;
   texto(t.titulo, negrito, 20);
@@ -73,10 +73,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ telaId:
     y -= 4;
   }
 
-  texto("O que cada item faz", negrito, 13);
-  y -= 4;
   const itens = (t.itens as { nome: string; faz: string; imagem?: string }[]) ?? [];
-  if (!itens.length) texto("Nenhum item cadastrado.", normal, 11);
+  if (!itens.length) texto("Esta tela ainda está em preparação.", normal, 11);
+  else {
+    texto("O que cada item faz", negrito, 13);
+    y -= 4;
+  }
   for (const it of itens) {
     espaco(34);
     texto(it.nome, negrito, 11);

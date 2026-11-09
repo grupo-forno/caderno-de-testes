@@ -11,15 +11,18 @@ export const dynamic = "force-dynamic";
 export default async function Page({ params, searchParams }: PageProps<"/admin/[id]/tela/[telaId]">) {
   await exigirAdmin();
   const { id, telaId } = await params;
-  const { erro, pai } = await searchParams;
+  const { erro, pai, modulo } = await searchParams;
   const nova = telaId === "nova";
-  let inicial = { titulo: "", imagem: null as string | null, link: null as string | null, pdf: null as string | null, itens: [] as { nome: string; faz: string; imagem?: string }[], paiId: null as string | null };
+  const modulos = await sql`select id, titulo from modulos where caderno_id::text = ${id} order by ordem`;
+  let inicial = { titulo: "", imagem: null as string | null, link: null as string | null, pdf: null as string | null, itens: [] as { id?: string; nome: string; faz: string; imagem?: string }[], paiId: null as string | null, moduloId: "" };
   let temFilhos = false;
   if (!nova) {
     const [t] = await sql`select * from telas where id::text = ${telaId} and caderno_id::text = ${id}`;
     if (!t) notFound();
-    inicial = { titulo: t.titulo, imagem: t.imagem_url, link: t.link_url, pdf: t.pdf_url, itens: t.itens, paiId: t.pai_id };
+    inicial = { titulo: t.titulo, imagem: t.imagem_url, link: t.link_url, pdf: t.pdf_url, itens: t.itens, paiId: t.pai_id, moduloId: t.modulo_id ?? "" };
     temFilhos = (await sql`select 1 from telas where pai_id = ${t.id} limit 1`).length > 0;
+  } else if (typeof modulo === "string" && modulos.some((m) => m.id === modulo)) {
+    inicial.moduloId = modulo; // vindo do botão "Adicionar tela" de um módulo
   }
   const principais = await sql`select id, titulo from telas where caderno_id::text = ${id} and pai_id is null and id::text <> ${nova ? "" : telaId} order by ordem`;
   // vindo do botão "Adicionar pop-up" de uma tela: já chega com a tela pai escolhida
@@ -38,6 +41,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             erro={typeof erro === "string" ? erro : undefined}
             principais={principais.map((p) => ({ id: p.id, titulo: p.titulo }))}
             temFilhos={temFilhos}
+            modulos={modulos.map((m) => ({ id: m.id, titulo: m.titulo }))}
           />
         </div>
       </main>
