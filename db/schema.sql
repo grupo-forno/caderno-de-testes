@@ -232,3 +232,25 @@ create index if not exists respostas_passo_item on respostas_passo (caderno, ite
 
 -- o histórico também registra o passo (null = mudança da funcionalidade inteira)
 alter table historico add column if not exists passo text
+
+;
+
+-- MÓDULO 2: BIBLIOTECA DE CENÁRIOS. Um cenário reaproveitável de teste, de uma tela ou de um fluxo entre módulos e perfis. Os passos ficam em jsonb: id, fazer, esperado, telaId e perfil
+create table if not exists cenarios (
+  id            uuid primary key default gen_random_uuid(),
+  caderno_id    uuid not null references cadernos(id) on delete cascade,
+  titulo        text not null,
+  objetivo      text not null default '',
+  tipo          text not null default 'funcional' check (tipo in ('desenho', 'funcional')),
+  pre_requisitos text not null default '',
+  dados_teste   text not null default '',
+  tela_id       uuid references telas(id) on delete set null,
+  passos        jsonb not null default '[]',
+  situacao      text not null default 'ativo' check (situacao in ('ativo', 'arquivado')),
+  origem_item   text,
+  criado        timestamptz not null default now(),
+  atualizado    timestamptz not null default now()
+)
+;
+
+create index if not exists cenarios_caderno on cenarios (caderno_id, situacao)

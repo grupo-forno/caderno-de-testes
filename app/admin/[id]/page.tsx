@@ -102,6 +102,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             <a href={`/c/${c.slug}`} target="_blank" className={btn2 + " inline-flex min-h-11 items-center"}>Ver como o cliente vê<span className="sr-only"> (abre em nova aba)</span></a>
             <Link href={`/admin/${id}/respostas`} className={btn2 + " inline-flex min-h-11 items-center"}>Ver respostas</Link>
             <Link href={`/admin/${id}/historico`} className={btn2 + " inline-flex min-h-11 items-center"}>Ver histórico</Link>
+            <Link href={`/admin/${id}/biblioteca`} className={btn2 + " inline-flex min-h-11 items-center"}>Biblioteca de testes</Link>
           </div>
           <FerramentasPlanilha cadernoId={id} />
         </section>

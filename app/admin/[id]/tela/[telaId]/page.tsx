@@ -4,6 +4,7 @@ import AdminBar from "@/components/AdminBar";
 import TelaForm from "@/components/TelaForm";
 import { exigirAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
+import { envolveTela, type Cenario } from "@/lib/cenarios";
 import { salvarTela } from "../../../actions";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,12 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   // vindo do botão "Adicionar pop-up" de uma tela: já chega com a tela pai escolhida
   if (nova && typeof pai === "string" && principais.some((p) => p.id === pai)) inicial.paiId = pai;
 
+  // cenários da biblioteca que envolvem esta tela (a principal ou a de algum passo)
+  const cs = nova ? [] : await sql`select id, titulo, tela_id, passos, situacao from cenarios where caderno_id::text = ${id} order by titulo`;
+  const cenarios = cs
+    .filter((c) => envolveTela({ telaId: c.tela_id, passos: c.passos } as Pick<Cenario, "telaId" | "passos">, telaId))
+    .map((c) => ({ id: c.id as string, titulo: c.titulo as string, arquivado: c.situacao === "arquivado" }));
+
   return (
     <>
       <AdminBar />
@@ -42,6 +49,8 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             principais={principais.map((p) => ({ id: p.id, titulo: p.titulo }))}
             temFilhos={temFilhos}
             modulos={modulos.map((m) => ({ id: m.id, titulo: m.titulo }))}
+            cadernoId={id}
+            cenarios={cenarios}
           />
         </div>
       </main>

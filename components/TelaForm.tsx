@@ -2,7 +2,9 @@
 
 import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
+import EditorPassos from "@/components/EditorPassos";
 import { btn, btn2, campo } from "@/components/estilos";
+import Link from "next/link";
 
 type Passo = { id?: string; fazer: string; esperado: string };
 type PassoLocal = Passo & { k: number };
@@ -100,7 +102,7 @@ const MENSAGEM_ERRO: Record<string, string> = {
 };
 
 export default function TelaForm({
-  acao, inicial, erro, principais, temFilhos, modulos,
+  acao, inicial, erro, principais, temFilhos, modulos, cadernoId, cenarios = [],
 }: {
   acao: (f: FormData) => void;
   inicial: Inicial;
@@ -108,6 +110,8 @@ export default function TelaForm({
   principais: { id: string; titulo: string }[];
   temFilhos: boolean;
   modulos: { id: string; titulo: string }[];
+  cadernoId: string;
+  cenarios?: { id: string; titulo: string; arquivado: boolean }[]; // cenários da biblioteca que envolvem esta tela
 }) {
   const [modulo, setModulo] = useState(inicial.moduloId || modulos[0]?.id || "");
   const [itens, setItens] = useState<ItemLocal[]>(() => (inicial.itens.length ? inicial.itens.map((i) => novoItem(i)) : [novoItem()]));
@@ -116,15 +120,6 @@ export default function TelaForm({
   const [programada, setProgramada] = useState(!!inicial.link);
   const [pdfProprio, setPdfProprio] = useState(!!inicial.pdf);
   const mudar = (k: number, p: Partial<ItemLocal>) => setItens(itens.map((x) => (x.k === k ? { ...x, ...p } : x)));
-  const mudarPasso = (k: number, pk: number, p: Partial<Passo>) => setItens(itens.map((x) => (x.k === k ? { ...x, passos: x.passos.map((s) => (s.k === pk ? { ...s, ...p } : s)) } : x)));
-  const moverPasso = (k: number, de: number, dir: -1 | 1) =>
-    setItens(itens.map((x) => {
-      const para = de + dir;
-      if (x.k !== k || para < 0 || para >= x.passos.length) return x;
-      const l = [...x.passos];
-      [l[de], l[para]] = [l[para], l[de]];
-      return { ...x, passos: l };
-    }));
   const podeSerPopup = !temFilhos && principais.length > 0;
 
   return (
@@ -214,29 +209,13 @@ export default function TelaForm({
                     <strong>Falta escrever o roteiro detalhado.</strong> Sem passos, o validador só vê a descrição acima e responde OK, NÃO OK ou NÃO TESTADO como antes.
                   </p>
                 )}
-                <ol className="mt-3 space-y-3">
-                  {it.passos.map((p, n) => (
-                    <li key={p.k} className="rounded-md border border-slate-200 bg-white p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm font-semibold">Passo {n + 1}</p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button type="button" disabled={n === 0} onClick={() => moverPasso(it.k, n, -1)} aria-label={`Subir o passo ${n + 1}`} className={btn2 + " min-h-11 px-3 disabled:opacity-30"}>↑</button>
-                          <button type="button" disabled={n === it.passos.length - 1} onClick={() => moverPasso(it.k, n, 1)} aria-label={`Descer o passo ${n + 1}`} className={btn2 + " min-h-11 px-3 disabled:opacity-30"}>↓</button>
-                          <button type="button" onClick={() => mudar(it.k, { passos: it.passos.filter((s) => s.k !== p.k) })} className="min-h-11 px-2 text-sm text-slate-600 underline">Remover<span className="sr-only"> o passo {n + 1}</span></button>
-                        </div>
-                      </div>
-                      <label className="mt-2 block text-xs font-medium text-slate-600">
-                        O que fazer <span className="font-normal">(obrigatório)</span>
-                        <textarea required rows={2} maxLength={2000} value={p.fazer} onChange={(e) => mudarPasso(it.k, p.k, { fazer: e.target.value })} placeholder="Ex.: Clique em Novo cadastro, preencha o nome e clique em Salvar" className={campo + " field-sizing-content min-h-14 resize-y text-slate-900"} />
-                      </label>
-                      <label className="mt-2 block text-xs font-medium text-slate-600">
-                        O que deve acontecer <span className="font-normal">(obrigatório)</span>
-                        <textarea required rows={2} maxLength={2000} value={p.esperado} onChange={(e) => mudarPasso(it.k, p.k, { esperado: e.target.value })} placeholder="Ex.: A tela volta para a lista e o novo cadastro aparece no topo" className={campo + " field-sizing-content min-h-14 resize-y text-slate-900"} />
-                      </label>
-                    </li>
-                  ))}
-                </ol>
-                <button type="button" onClick={() => mudar(it.k, { passos: [...it.passos, novoPasso()] })} className={btn2 + " mt-3 min-h-11"}>Adicionar passo</button>
+                <EditorPassos passos={it.passos} aoMudar={(lista) => mudar(it.k, { passos: lista })} novo={() => novoPasso()} />
+                {it.id && it.passos.length > 0 && (
+                  <p className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
+                    <Link href={`/admin/${cadernoId}/biblioteca/novo?de=${it.id}`} className="font-medium text-indigo-800 underline">Criar cenário a partir deste roteiro</Link>
+                    <span className="mt-1 block text-xs text-slate-600">Abre o editor da biblioteca com uma cópia dos passos salvos para você revisar. O roteiro desta funcionalidade e as respostas dele não mudam. Salve a tela antes se mexeu nos passos.</span>
+                  </p>
+                )}
               </fieldset>
               <div className="sm:col-span-3">
                 <Arquivo nome="itemImagem" rotulo="Imagem deste item (opcional)" substantivo="imagem" accept="image/png,image/jpeg,image/webp" limiteMb={10} inicial={it.imagem ?? null} />
@@ -261,6 +240,20 @@ export default function TelaForm({
           </div>
         )}
       </div>
+
+      {cenarios.length > 0 && (
+        <section aria-labelledby="t-cenarios" className="rounded-md border border-slate-200 bg-white p-3">
+          <h2 id="t-cenarios" className="text-sm font-semibold">Cenários da biblioteca que usam esta tela</h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {cenarios.map((c) => (
+              <li key={c.id}>
+                <Link href={`/admin/${cadernoId}/biblioteca/${c.id}`} className="text-indigo-800 underline">{c.titulo}</Link>
+                {c.arquivado && <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">Arquivado</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <button className={btn}>Salvar tela</button>
     </form>
