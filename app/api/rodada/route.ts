@@ -22,6 +22,38 @@ export async function GET(req: Request) {
       select x.atribuicao_id, x.passo, x.resultado, x.obs, x.anexos from respostas_atribuicao x
       join rodada_atribuicoes a on a.id = x.atribuicao_id where a.validador_id = ${v.id}`;
     const composto = (a: string, p: string) => `${a}_${p}`;
+
+    // retestes pedidos pela equipe para esta pessoa (abertos e já enviados, para consulta), cada um com a tentativa original da falha
+    const rts = await sql`
+      select t.id, t.numero, t.corrigido, t.versao, t.passos, t.solicitado_por, t.solicitado_em, t.status, t.resultado, t.enviado_em,
+        p.id as pendencia_id, p.passo as passo_falho, p.situacao, p.atribuicao_id, rc.snapshot
+      from pendencia_retestes t join pendencias p on p.id = t.pendencia_id
+      join rodada_atribuicoes a on a.id = t.atribuicao_id join rodada_cenarios rc on rc.id = a.rodada_cenario_id
+      where a.validador_id = ${v.id} order by t.solicitado_em, t.numero`;
+    const respRt = await sql`
+      select x.reteste_id, x.passo, x.resultado, x.obs, x.anexos from respostas_reteste x
+      join pendencia_retestes t on t.id = x.reteste_id join rodada_atribuicoes a on a.id = t.atribuicao_id where a.validador_id = ${v.id}`;
+    const retestes = rts.map((t) => {
+      const s = t.snapshot as CenarioSnap;
+      const original = resp.find((x) => x.atribuicao_id === t.atribuicao_id && x.passo === t.passo_falho);
+      const pedidos = new Set(t.passos as string[]);
+      return {
+        id: t.id,
+        numero: t.numero,
+        corrigido: t.corrigido,
+        versao: t.versao,
+        solicitadoPor: t.solicitado_por,
+        solicitadoEm: new Date(t.solicitado_em).toISOString(),
+        status: t.status,
+        resultado: t.resultado,
+        enviadoEm: t.enviado_em ? new Date(t.enviado_em).toISOString() : null,
+        pendenciaSituacao: t.situacao,
+        cenario: { titulo: s.titulo, objetivo: s.objetivo, preRequisitos: s.preRequisitos, dadosTeste: s.dadosTeste, perfis: s.perfis, modulos: s.modulos },
+        passos: s.passos.filter((p) => pedidos.has(p.id)).map((p) => ({ ...p, id: composto(t.id, p.id), falhou: p.id === t.passo_falho })),
+        falhaOriginal: original ? { passoId: composto(t.id, t.passo_falho), obs: original.obs, anexos: original.anexos } : null,
+      };
+    });
+    const respostasReteste = Object.fromEntries(respRt.map((x) => [composto(x.reteste_id, x.passo), { resultado: x.resultado, obs: x.obs, anexos: x.anexos }]));
     return Response.json(
       {
         rodada: { sistema: r.sistema, nome: r.nome, versao: r.versao, ambienteUrl: r.ambiente_url, prazo: r.prazo, resumo: r.resumo, instrucoes: r.instrucoes, foraEscopo: r.fora_escopo },
@@ -30,6 +62,8 @@ export async function GET(req: Request) {
           const s = a.snapshot as CenarioSnap;
           return { id: a.id, enviadoEm: a.enviado_em ? new Date(a.enviado_em).toISOString() : null, cenario: { ...s, passos: s.passos.map((p) => ({ ...p, id: composto(a.id, p.id) })) } };
         }),
+        retestes,
+        respostasReteste,
         respostas: Object.fromEntries(resp.map((x) => [composto(x.atribuicao_id, x.passo), { resultado: x.resultado, obs: x.obs, anexos: x.anexos }])),
       },
       { headers: NO_STORE },

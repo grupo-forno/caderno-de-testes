@@ -28,7 +28,19 @@ export async function POST(req: Request) {
     // idempotente: reenviar não muda nada (só as atribuições ainda abertas são fechadas, e cada uma ganha um registro)
     const aEnviar = atrib.filter((a) => !a.enviado_em);
     if (aEnviar.length) {
+      const autor = `Validador: ${v.nome}`;
       await sql.transaction([
+        // cada falha (Deu diferente) vira UMA pendência (única por atribuição e passo, então reenviar não duplica). Bloqueio e comentário não viram pendência.
+        ...aEnviar.map((a) => sql`
+          with novas as (
+            insert into pendencias (rodada_id, atribuicao_id, passo)
+            select ${v.rodadaId}::uuid, x.atribuicao_id, x.passo from respostas_atribuicao x
+            where x.atribuicao_id = ${a.id}::uuid and x.resultado = 'diferente'
+              and exists (select 1 from rodada_atribuicoes where id = ${a.id}::uuid and enviado_em is null)
+            on conflict (atribuicao_id, passo) do nothing returning id, atribuicao_id, passo
+          )
+          insert into pendencia_eventos (pendencia_id, tipo, autor, obs)
+          select n.id, 'aberta', ${autor}, x.obs from novas n join respostas_atribuicao x on x.atribuicao_id = n.atribuicao_id and x.passo = n.passo`),
         ...aEnviar.map((a) => sql`insert into rodada_eventos (atribuicao_id, tipo) select ${a.id}::uuid, 'envio' where exists (select 1 from rodada_atribuicoes where id = ${a.id}::uuid and enviado_em is null)`),
         sql`update rodada_atribuicoes set enviado_em = now() where validador_id = ${v.id} and enviado_em is null`,
       ]);

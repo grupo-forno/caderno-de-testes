@@ -340,3 +340,89 @@ create index if not exists rodada_cenarios_rodada on rodada_cenarios (rodada_id)
 ;
 
 create index if not exists rodada_atribuicoes_validador on rodada_atribuicoes (validador_id)
+
+;
+
+-- MÓDULO 4: PENDÊNCIAS, CORREÇÕES E RETESTE. Cada falha (Deu diferente) enviada pelo validador vira uma pendência. Uma pendência por atribuição e passo, então reenviar não duplica
+create table if not exists pendencias (
+  id             uuid primary key default gen_random_uuid(),
+  rodada_id      uuid not null references rodadas(id) on delete cascade,
+  atribuicao_id  uuid not null references rodada_atribuicoes(id) on delete cascade,
+  passo          text not null,
+  reteste_origem uuid,
+  situacao       text not null default 'aberta' check (situacao in ('aberta', 'em_correcao', 'aguardando_reteste', 'resolvida')),
+  responsavel    text not null default '',
+  issue_url      text,
+  criado         timestamptz not null default now(),
+  atualizado     timestamptz not null default now(),
+  unique (atribuicao_id, passo)
+)
+;
+
+-- pedido de reteste: uma nova tentativa do validador, com o que foi corrigido, a versão a conferir e os passos a refazer
+create table if not exists pendencia_retestes (
+  id            uuid primary key default gen_random_uuid(),
+  pendencia_id  uuid not null references pendencias(id) on delete cascade,
+  atribuicao_id uuid not null references rodada_atribuicoes(id) on delete cascade,
+  numero        int not null,
+  corrigido     text not null,
+  versao        text not null,
+  passos        jsonb not null default '[]',
+  solicitado_por text not null default 'Equipe',
+  solicitado_em timestamptz not null default now(),
+  status        text not null default 'solicitado' check (status in ('solicitado', 'enviado')),
+  resultado     text check (resultado in ('resolvida', 'falhou', 'bloqueado')),
+  enviado_em    timestamptz,
+  unique (pendencia_id, numero)
+)
+;
+
+-- só pode haver um pedido aberto por pendência: clique repetido não cria dois pedidos
+create unique index if not exists pendencia_reteste_aberto on pendencia_retestes (pendencia_id) where status = 'solicitado'
+;
+
+create table if not exists respostas_reteste (
+  reteste_id uuid not null references pendencia_retestes(id) on delete cascade,
+  passo      text not null,
+  resultado  text not null check (resultado in ('funcionou', 'diferente', 'nao_consegui')),
+  obs        text not null default '',
+  anexos     jsonb not null default '[]',
+  atualizado timestamptz not null default now(),
+  primary key (reteste_id, passo)
+)
+;
+
+-- histórico de acréscimo: nada é apagado nem editado
+create table if not exists pendencia_eventos (
+  id           bigserial primary key,
+  pendencia_id uuid not null references pendencias(id) on delete cascade,
+  tipo         text not null,
+  autor        text not null,
+  obs          text not null default '',
+  dados        jsonb not null default '{}',
+  criado       timestamptz not null default now()
+)
+;
+
+create index if not exists pendencias_rodada on pendencias (rodada_id, situacao)
+;
+
+create index if not exists pendencia_eventos_pendencia on pendencia_eventos (pendencia_id, criado)
+;
+
+create index if not exists pendencia_retestes_atribuicao on pendencia_retestes (atribuicao_id)
+;
+
+-- falhas que já tinham sido enviadas antes deste módulo também viram pendência (pode rodar de novo sem duplicar)
+with novas as (
+  insert into pendencias (rodada_id, atribuicao_id, passo)
+  select rc.rodada_id, a.id, x.passo
+  from respostas_atribuicao x
+  join rodada_atribuicoes a on a.id = x.atribuicao_id
+  join rodada_cenarios rc on rc.id = a.rodada_cenario_id
+  where x.resultado = 'diferente' and a.enviado_em is not null
+  on conflict (atribuicao_id, passo) do nothing
+  returning id
+)
+insert into pendencia_eventos (pendencia_id, tipo, autor, obs)
+select id, 'aberta', 'Sistema', 'Pendência criada a partir de um envio anterior' from novas

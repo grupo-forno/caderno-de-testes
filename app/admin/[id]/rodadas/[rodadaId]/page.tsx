@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
+import AbasRodada from "@/components/AbasRodada";
 import AdminBar from "@/components/AdminBar";
 import { btn, btn2, campo } from "@/components/estilos";
 import SelecaoCenarios from "@/components/SelecaoCenarios";
@@ -73,6 +74,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
         <AdminBar />
         <main className="mx-auto max-w-4xl px-4 py-8">
           {topo}
+          <AbasRodada cadernoId={id} rodadaId={rodadaId} ativa="geral" abertas={(await sql`select count(*)::int as n from pendencias where rodada_id = ${rodadaId} and situacao <> 'resolvida'`)[0].n} />
           {sp.novolink && <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">Novo link gerado. O anterior deixou de funcionar. Copie o link atualizado na lista de validadores.</p>}
 
           <section aria-labelledby="t-entrega" className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
@@ -172,7 +174,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                         <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${f.enviado ? COR_ESTADO.enviado : COR_ESTADO.em_andamento}`}>{f.enviado ? "Enviado" : "Ainda não enviado"}</span>
                       </span>
                     </div>
-                    <p className="text-xs text-slate-700">{f.validador}{f.perfil ? ` · perfil ${f.perfil}` : ""}</p>
+                    <p className="text-xs text-slate-700">{f.validador}{f.perfil ? ` · perfil ${f.perfil}` : ""}{f.pendenciaId && <> · <Link href={`${aqui}/pendencias/${f.pendenciaId}`} className="font-medium text-indigo-800 underline">Ver pendência</Link></>}</p>
                     <p className="mt-2 whitespace-pre-wrap"><span className="font-medium">O que fazer:</span> {f.fazer}</p>
                     <p className="mt-1 whitespace-pre-wrap"><span className="font-medium">O que deveria acontecer:</span> {f.esperado}</p>
                     <p className="mt-1 whitespace-pre-wrap"><span className="font-medium">{f.resultado === "diferente" ? "O que o validador viu:" : "Por que não conseguiu testar:"}</span> {f.obs || "sem explicação"}</p>

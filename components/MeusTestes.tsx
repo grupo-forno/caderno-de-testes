@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Execucao, { ChipEstado, type PassoFila } from "@/components/Execucao";
+import Reteste, { type RetesteDados } from "@/components/Reteste";
 import { estadoPasso, passoCompleto } from "@/lib/passos";
 import { pendentes as passosPendentes, progresso, ROTULO_ESTADO_ATRIBUICAO, somar, type CenarioSnap } from "@/lib/rodadas";
 import type { RespPasso } from "@/lib/tipos";
@@ -16,6 +17,8 @@ export type DadosRodada = {
   validador: { nome: string; nota: string };
   atribuicoes: { id: string; enviadoEm: string | null; cenario: CenarioSnap }[]; // ids dos passos já vêm como "<atribuição>_<passo>"
   respostas: Record<string, RespPasso>;
+  retestes?: RetesteDados[]; // pedidos de reteste desta pessoa (abertos e enviados)
+  respostasReteste?: Record<string, RespPasso>; // ids no formato "<reteste>_<passo>"
 };
 
 const dia = (iso: string) => iso.split("-").reverse().join("/");
@@ -98,7 +101,7 @@ export default function MeusTestesAoVivo() {
   return <MeusTestes dados={dados!} token={token} />;
 }
 
-type Vista = { t: "inicio" } | { t: "passo"; id: string } | { t: "resumo" };
+type Vista = { t: "inicio" } | { t: "passo"; id: string } | { t: "resumo" } | { t: "reteste"; id: string };
 
 // A tela inteira. Em "previa" (equipe, rodada em rascunho) mostra igual, mas nada é salvo nem enviado.
 export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodada; token?: string | null; previa?: boolean }) {
@@ -106,6 +109,8 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
   const [enviados, setEnviados] = useState<Record<string, string | null>>(() => Object.fromEntries(dados.atribuicoes.map((a) => [a.id, a.enviadoEm])));
   const [envio, setEnvio] = useState<{ fase: "parado" | "enviando"; erro: string | null }>({ fase: "parado", erro: null });
   const [confirmando, setConfirmando] = useState(false);
+  const [retestes, setRetestes] = useState<RetesteDados[]>(dados.retestes ?? []);
+  const [respRt, setRespRt] = useState<Record<string, RespPasso>>(dados.respostasReteste ?? {});
   const cred = token && !previa ? { caderno: "", chave: token, api: "/api/rodada/resposta" } : null;
   const ps = usePassos(cred);
   const { definir } = ps;
@@ -148,6 +153,8 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
   const ocupado = ps.ocupado > 0 || ps.falhas > 0;
 
   const irPara = (id: string) => setVista({ t: "passo", id });
+  const retestesAbertos = retestes.filter((t) => t.status === "solicitado");
+  const retestesEnviados = retestes.filter((t) => t.status === "enviado");
   const primeiroPendente = (ids?: string[]) => (ids ?? fila.map((f) => f.passo.id)).find((id) => !passoCompleto(resp[id])) ?? (ids ?? fila.map((f) => f.passo.id))[0];
 
   async function enviar() {
@@ -212,6 +219,27 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
       )}
     </div>
   );
+
+  // ---------- reteste ----------
+  if (vista.t === "reteste") {
+    const t = retestes.find((x) => x.id === vista.id);
+    if (t) {
+      const respostas: Record<string, RespPasso> = {};
+      for (const p of t.passos) if (respRt[p.id]) respostas[p.id] = respRt[p.id];
+      return (
+        <Reteste
+          key={t.id}
+          reteste={t}
+          respostas={respostas}
+          token={token}
+          previa={previa}
+          aoVoltar={() => setVista({ t: "inicio" })}
+          aoAtualizar={(m) => setRespRt((x) => ({ ...x, ...m }))}
+          aoEnviado={(id, resultado, situacao) => setRetestes((l) => l.map((x) => (x.id === id ? { ...x, status: "enviado", resultado, pendenciaSituacao: situacao, enviadoEm: new Date().toISOString() } : x)))}
+        />
+      );
+    }
+  }
 
   // ---------- passo ----------
   if (vista.t === "passo") {
@@ -356,6 +384,25 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
         {dados.rodada.foraEscopo && <section className="mt-3"><h3 className="text-sm font-semibold">Fora do escopo desta rodada</h3><p className="whitespace-pre-wrap text-sm text-slate-800">{dados.rodada.foraEscopo}</p></section>}
         {dados.validador.nota && <p className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"><strong>Orientação para você:</strong> {dados.validador.nota}</p>}
 
+        {retestesAbertos.length > 0 && (
+          <section aria-labelledby="t-retestes" className="mt-5 rounded-lg border-2 border-violet-400 bg-violet-50 p-4">
+            <h3 id="t-retestes" className="text-lg font-semibold text-violet-950">Retestes pendentes ({retestesAbertos.length})</h3>
+            <p className="mt-1 text-sm text-violet-950">A equipe corrigiu o que você relatou e pediu para conferir de novo.</p>
+            <ul className="mt-3 space-y-2">
+              {retestesAbertos.map((t) => (
+                <li key={t.id} className="rounded-md border border-violet-200 bg-white p-3 text-sm">
+                  <p className="font-semibold">{t.cenario.titulo} <span className="font-normal text-slate-700">· reteste {t.numero} · versão {t.versao}</span></p>
+                  <p className="mt-1 whitespace-pre-wrap text-slate-800"><span className="font-medium">Corrigido:</span> {t.corrigido}</p>
+                  <p className="text-xs text-slate-700">{plural(t.passos.length, "passo para refazer", "passos para refazer")} · pedido por {t.solicitadoPor}</p>
+                  <button type="button" onClick={() => setVista({ t: "reteste", id: t.id })} className={`mt-2 min-h-11 rounded-md bg-violet-700 px-5 text-sm font-semibold text-white hover:bg-violet-800 ${FOCO}`}>
+                    {t.passos.some((p) => respRt[p.id]) ? "Continuar reteste" : "Começar reteste"}<span className="sr-only"> de {t.cenario.titulo}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <div className="mt-5 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
           <p className="text-sm text-indigo-950">
             {todosEnviados ? "Você já enviou todos os seus resultados." : iniciou ? `Você respondeu ${geral.respondidos} de ${geral.total} passos. Suas respostas são salvas sozinhas.` : `${plural(dados.atribuicoes.length, "teste atribuído", "testes atribuídos")} a você, com ${plural(geral.total, "passo", "passos")} no total.`}
@@ -411,6 +458,19 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
                 </ul>
               </section>
             ))}
+            {retestesEnviados.length > 0 && (
+              <section aria-labelledby="t-rt-env" className="mt-6">
+                <h3 id="t-rt-env" className="text-base font-semibold">Retestes enviados</h3>
+                <ul className="mt-2 space-y-2">
+                  {retestesEnviados.map((t) => (
+                    <li key={t.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm">
+                      <span className="min-w-0 flex-1">{t.cenario.titulo} · reteste {t.numero} · versão {t.versao}</span>
+                      <button type="button" onClick={() => setVista({ t: "reteste", id: t.id })} className={`min-h-11 rounded-md border border-slate-400 bg-white px-4 font-medium hover:bg-slate-50 ${FOCO}`}>Consultar<span className="sr-only"> reteste {t.numero} de {t.cenario.titulo}</span></button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             <div className="mt-6 border-t border-slate-200 pt-4">
               <button type="button" onClick={() => setVista({ t: "resumo" })} className={`min-h-11 rounded-md border border-indigo-700 bg-white px-5 text-sm font-semibold text-indigo-900 hover:bg-indigo-50 ${FOCO}`}>
                 {todosEnviados ? "Ver resumo" : "Enviar meus resultados"}

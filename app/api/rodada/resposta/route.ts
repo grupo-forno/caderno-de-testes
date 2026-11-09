@@ -40,7 +40,12 @@ export async function PUT(req: Request) {
 
     // um print não pode ser reaproveitado de outra pessoa
     for (const u of anexos as string[]) {
-      const [uso] = await sql`select 1 from respostas_atribuicao where atribuicao_id <> ${atribuicao} and jsonb_exists(anexos, ${u}) limit 1`;
+      const [uso] = await sql`
+        select 1 from (
+          select anexos from respostas_atribuicao where atribuicao_id <> ${atribuicao}
+          union all
+          select x.anexos from respostas_reteste x join pendencia_retestes r on r.id = x.reteste_id where r.atribuicao_id <> ${atribuicao}
+        ) u where jsonb_exists(anexos, ${u}) limit 1`;
       if (uso) return erro("Um dos prints não é seu. Remova-o e anexe de novo.", 400);
     }
 
