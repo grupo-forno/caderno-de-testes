@@ -197,3 +197,38 @@ create index if not exists telas_modulo on telas (modulo_id);
 create index if not exists telas_pai on telas (pai_id);
 
 create index if not exists modulos_caderno on modulos (caderno_id)
+;
+
+-- MÓDULO 1: ROTEIRO DE TESTE. Os passos de cada funcionalidade ficam dentro de telas.itens (campo "passos"), então a tabela de telas não muda.
+-- Endereço do ambiente de teste (opcional), mostrado ao validador como "Abrir ambiente de teste"
+alter table cadernos add column if not exists ambiente_url text;
+
+-- Quem valida ganha uma chave secreta (guardamos só o hash). Ela, e não o e-mail digitado, prova quem é a pessoa nos passos e prints.
+create table if not exists validadores (
+  caderno    text not null,
+  email      text not null,
+  nome       text not null,
+  token_hash text not null unique,
+  criado     timestamptz not null default now(),
+  primary key (caderno, email)
+);
+
+-- Resposta de uma pessoa a um passo do roteiro
+create table if not exists respostas_passo (
+  caderno    text not null,
+  email      text not null,
+  nome       text not null,
+  tela       text not null,
+  item       text not null,
+  passo      text not null,
+  resultado  text not null check (resultado in ('funcionou', 'diferente', 'nao_consegui')),
+  obs        text not null default '',
+  anexos     jsonb not null default '[]',
+  atualizado timestamptz not null default now(),
+  primary key (caderno, email, passo)
+);
+
+create index if not exists respostas_passo_item on respostas_passo (caderno, item);
+
+-- o histórico também registra o passo (null = mudança da funcionalidade inteira)
+alter table historico add column if not exists passo text

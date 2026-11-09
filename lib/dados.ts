@@ -14,6 +14,7 @@ export async function buscarCaderno(slug: string): Promise<{ id: string; caderno
       data: new Date(c.atualizado).toLocaleDateString("pt-BR"),
       preparadoPor: c.preparado_por,
       antesDeComecar: String(c.antes).split("\n").map((s) => s.trim()).filter(Boolean),
+      ambienteUrl: c.ambiente_url ?? null,
       modulos: modulos.map((m) => ({ id: m.id, titulo: m.titulo })),
       telas: telas.map((t) => ({
         id: t.id,

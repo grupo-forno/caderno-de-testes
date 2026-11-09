@@ -1,17 +1,23 @@
 import type { NextRequest } from "next/server";
 import { aceiteVigente } from "@/lib/aceite";
+import { URL_ANEXO } from "@/lib/anexos";
 import { sql } from "@/lib/db";
 import { SEVERIDADES, type Evento, type Severidade } from "@/lib/tipos";
 
-// os prints só valem se estiverem na NOSSA loja de arquivos (o id dela vem de BLOB_STORE_ID)
-const LOJA = (process.env.BLOB_STORE_ID ?? "").replace(/^store_/, "").toLowerCase().replace(/[^a-z0-9]/g, "");
-const URL_ANEXO = LOJA ? new RegExp(`^https://${LOJA}\\.public\\.blob\\.vercel-storage\\.com/`, "i") : /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\//i;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_HISTORICO_POR_ITEM = 30;
 const JUNTAR_OBSERVACOES_EM_MIN = 10; // várias edições de texto seguidas viram um registro só
 
 const ehUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-const erro = (msg: string, status: number) => Response.json({ erro: msg }, { status });
+const erro = (msg: string, status: number, codigo?: string) => Response.json({ erro: msg, codigo }, { status });
+
+// funcionalidades do caderno que têm roteiro de teste
+async function idsComRoteiro(caderno: string): Promise<Set<string>> {
+  const rows = await sql`
+    select e->>'id' as id from telas t join cadernos c on c.id = t.caderno_id, jsonb_array_elements(t.itens) e
+    where c.slug = ${caderno} and jsonb_typeof(e->'passos') = 'array' and jsonb_array_length(e->'passos') > 0`;
+  return new Set(rows.map((x) => x.id as string));
+}
 const texto = (v: unknown, max = 200) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
 // Devolve as respostas de uma pessoa e o histórico delas (e das correções feitas por quem monta o caderno):
@@ -24,12 +30,15 @@ export async function GET(req: NextRequest) {
     const [c] = await sql`select 1 from cadernos where slug = ${caderno}`;
     if (!c) return erro("Não encontramos este caderno. Confira se o link está completo.", 404);
     const aceite = await aceiteVigente(caderno);
-    const rows = await sql`select item, resultado, obs, anexos, severidade from respostas_item where caderno = ${caderno} and email = ${e}`;
+    // itens com roteiro só se consultam com a chave (GET /api/passos): o e-mail sozinho não prova quem é a pessoa
+    const comRoteiro = await idsComRoteiro(caderno);
+    const rows = (await sql`select item, resultado, obs, anexos, severidade from respostas_item where caderno = ${caderno} and email = ${e}`).filter((x) => !comRoteiro.has(x.item));
     const ev = await sql`
       select item, tipo, ator, nome, de, para, obs, anexos, severidade, criado from historico
       where caderno = ${caderno} and item <> '' and (email = ${e} or tipo = 'correcao') order by criado, id`;
     const historico: Record<string, Evento[]> = {};
     for (const x of ev) {
+      if (comRoteiro.has(x.item)) continue;
       const lista = (historico[x.item] ??= []);
       lista.push({ tipo: x.tipo, ator: x.ator, nome: x.nome, de: x.de, para: x.para, obs: x.obs, anexos: x.anexos, severidade: x.severidade, criado: new Date(x.criado).toISOString() });
       if (lista.length > MAX_HISTORICO_POR_ITEM) lista.shift();
@@ -85,6 +94,7 @@ export async function PUT(req: NextRequest) {
       where c.slug = ${caderno} and t.id = ${tela}::uuid
         and t.itens @> jsonb_build_array(jsonb_build_object('id', ${item}::text))`;
     if (!ok) return erro("Essa funcionalidade não existe mais. Recarregue a página e tente de novo.", 400);
+    if ((await idsComRoteiro(caderno)).has(item)) return erro("Esta funcionalidade agora tem um roteiro de teste passo a passo. Recarregue a página e responda pelos passos.", 409, "roteiro");
 
     // TUDO NUMA TRANSAÇÃO SÓ: a resposta e o histórico entram juntos ou não entra nada.
     // Os dois registros do histórico olham a resposta ANTERIOR (por isso vêm antes de gravar a nova).

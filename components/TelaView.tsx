@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChipEstado, idPasso } from "@/components/Execucao";
 import Imagem from "@/components/Imagem";
 import LinkTela from "@/components/LinkTela";
 import { ChipStatus, COR_ICONE, IconeStatus } from "@/components/StatusBadge";
+import { estadoPasso, passoCompleto, temRoteiro } from "@/lib/passos";
 import { ROTULO_STATUS, type ResumoTela } from "@/lib/status";
-import { ROTULO_SEVERIDADE, SEVERIDADES, type Evento, type Item, type Resp, type Resultado, type Tela } from "@/lib/tipos";
+import { ROTULO_SEVERIDADE, SEVERIDADES, type Evento, type Item, type Resp, type RespPasso, type Resultado, type Tela } from "@/lib/tipos";
 
 export const OPCOES: { v: Resultado; label: string; dica: string }[] = [
   { v: "ok", label: "OK", dica: "Testei e está aprovado." },
@@ -75,12 +77,17 @@ type Props = {
   erroAnexo: { id: string; msg: string } | null;
   okAnexo: { id: string; msg: string } | null;
   somenteLeitura: boolean; // homologação concluída: ninguém muda mais nada
+  respPassos: Record<string, RespPasso>; // respostas aos passos dos roteiros
 };
 
-function Funcionalidade({ tela, item, indice, r, eventos, aberto, aoAlternar, aoMudar, aoAnexar, enviando, erroAnexo, okAnexo, somenteLeitura }: {
+function Funcionalidade({ tela, item, indice, r, eventos, aberto, aoAlternar, aoMudar, aoAnexar, enviando, erroAnexo, okAnexo, somenteLeitura, respPassos, aoIr }: {
   tela: Tela; item: Item; indice: number; r: Resp; eventos: Evento[]; aberto: boolean; aoAlternar: () => void;
   aoMudar: Props["aoMudar"]; aoAnexar: Props["aoAnexar"]; enviando: boolean; erroAnexo: string | null; okAnexo: string | null; somenteLeitura: boolean;
+  respPassos: Props["respPassos"]; aoIr: Props["aoIr"];
 }) {
+  const passos = temRoteiro(item) ? item.passos : [];
+  const feitos = passos.filter((p) => passoCompleto(respPassos[p.id])).length;
+  const proximoPasso = passos.find((p) => !passoCompleto(respPassos[p.id])) ?? passos[0];
   const idNome = `f-${item.id}`;
   const idCorpo = `c-${item.id}`;
   const faltaObs = r.resultado === "nao_ok" && !r.obs.trim();
@@ -168,7 +175,29 @@ function Funcionalidade({ tela, item, indice, r, eventos, aberto, aoAlternar, ao
           )}
         </div>
 
-        {somenteLeitura ? (
+        {passos.length > 0 ? (
+          <section aria-label={`Roteiro de teste de ${item.nome}`} className="mt-4 rounded-md border border-indigo-200 bg-indigo-50/60 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h5 className="text-sm font-semibold text-indigo-950">Roteiro de teste · {feitos} de {passos.length} {passos.length === 1 ? "passo respondido" : "passos respondidos"}</h5>
+              {proximoPasso && (
+                <LinkTela id={idPasso(proximoPasso.id)} aoIr={aoIr} className={`inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>
+                  {somenteLeitura || feitos === passos.length ? "Rever o roteiro" : feitos > 0 ? "Continuar roteiro" : "Começar roteiro"}
+                </LinkTela>
+              )}
+            </div>
+            <ol className="mt-3 space-y-2">
+              {passos.map((p, n) => (
+                <li key={p.id}>
+                  <LinkTela id={idPasso(p.id)} aoIr={aoIr} className={`flex min-h-11 flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 ${FOCO}`}>
+                    <span className="font-semibold tabular-nums">Passo {n + 1}</span>
+                    <span className="min-w-0 flex-1 truncate text-slate-700">{p.fazer}</span>
+                    <ChipEstado estado={estadoPasso(respPassos[p.id])} />
+                  </LinkTela>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : somenteLeitura ? (
           <div className="mt-4 text-sm">
             <p><span className="font-semibold">Resultado:</span> {ROTULO[r.resultado]}</p>
             {r.resultado === "nao_ok" && r.severidade && <p className="mt-1"><span className="font-semibold">Gravidade:</span> {ROTULO_SEVERIDADE[r.severidade]}</p>}
@@ -278,7 +307,7 @@ function Funcionalidade({ tela, item, indice, r, eventos, aberto, aoAlternar, ao
 
 type Filtro = "todas" | "nao_ok" | "pendentes" | "ok";
 
-export default function TelaView({ tela, numero, pai, filhos, resumos, res, historico, aoMudar, aoIr, voltar, avancar, aoAnexar, enviando, erroAnexo, okAnexo, somenteLeitura }: Props) {
+export default function TelaView({ tela, numero, pai, filhos, resumos, res, historico, aoMudar, aoIr, voltar, avancar, aoAnexar, enviando, erroAnexo, okAnexo, somenteLeitura, respPassos }: Props) {
   const itens = tela.itens;
   const resumo = resumos[tela.id];
   const pop = !!pai;
@@ -319,6 +348,16 @@ export default function TelaView({ tela, numero, pai, filhos, resumos, res, hist
         <p className="mt-1 text-sm tabular-nums text-slate-700">
           {resumo.ok} de {resumo.total} {resumo.total === 1 ? "funcionalidade" : "funcionalidades"} OK
           {resumo.naoOk > 0 && <span className="font-semibold text-rose-800"> · {resumo.naoOk} NÃO OK</span>}
+        </p>
+      )}
+
+      {itens.length > 0 && (
+        <p className="mt-3 print:hidden">
+          {tela.link ? (
+            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900 ring-1 ring-inset ring-emerald-300">Tela programada: dá para testar de verdade</span>
+          ) : (
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800 ring-1 ring-inset ring-slate-300">Só desenho: confira pela imagem</span>
+          )}
         </p>
       )}
 
@@ -398,6 +437,8 @@ export default function TelaView({ tela, numero, pai, filhos, resumos, res, hist
                   erroAnexo={erroAnexo?.id === it.id ? erroAnexo.msg : null}
                   okAnexo={okAnexo?.id === it.id ? okAnexo.msg : null}
                   somenteLeitura={somenteLeitura}
+                  respPassos={respPassos}
+                  aoIr={aoIr}
                 />
               ))}
             </div>

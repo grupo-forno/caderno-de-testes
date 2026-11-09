@@ -25,10 +25,16 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   const nomeModulo = new Map(modulos.map((m) => [m.id as string, m.titulo as string]));
   const nomeTela = new Map(telas.map((t) => [t.id as string, { titulo: t.titulo as string, modulo: nomeModulo.get(t.modulo_id) ?? "" }]));
   const nomeItem = new Map<string, string>();
-  for (const t of telas) for (const i of t.itens as { id: string; nome: string }[]) nomeItem.set(i.id, i.nome);
+  const numeroPasso = new Map<string, number>(); // id do passo -> posição (1, 2, 3...) dentro da funcionalidade
+  for (const t of telas) {
+    for (const i of t.itens as { id: string; nome: string; passos?: { id: string }[] }[]) {
+      nomeItem.set(i.id, i.nome);
+      i.passos?.forEach((p, n) => numeroPasso.set(p.id, n + 1));
+    }
+  }
 
   const eventos = await sql`
-    select id, tela, item, ator, nome, tipo, de, para, obs, anexos, criado from historico
+    select id, tela, item, passo, ator, nome, tipo, de, para, obs, anexos, criado from historico
     where caderno = ${c.slug} and (${item}::text is null or item = ${item}) and (${tela}::text is null or tela = ${tela})
     order by criado desc, id desc limit ${LIMITE}`;
 
@@ -59,7 +65,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                 const nomeDoItem = nomeItem.get(e.item);
                 const t = nomeTela.get(e.tela);
                 const onde = t ? ` (tela ${t.titulo}${t.modulo ? `, módulo ${t.modulo}` : ""})` : " (funcionalidade removida)";
-                const alvo = `“${nomeDoItem ?? "Funcionalidade removida"}”${onde}`;
+                const alvo = `${e.passo ? `passo ${numeroPasso.get(e.passo) ?? "removido"} de ` : ""}“${nomeDoItem ?? "Funcionalidade removida"}”${onde}`;
                 return (
                   <li key={e.id} className={`rounded-lg border bg-white p-4 text-sm ${e.tipo === "correcao" ? "border-amber-300" : e.tipo === "aceite" ? "border-emerald-400" : e.tipo === "reabertura" ? "border-slate-500" : "border-slate-200"}`}>
                     <p>
@@ -73,7 +79,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                           {e.de && <span className="text-slate-700"> (antes: {ROTULO_RESULTADO[e.de] ?? e.de})</span>} em{" "}
                         </>
                       )}
-                      {e.tipo === "observacao" && <>atualizou a observação de </>}
+                      {e.tipo === "observacao" && <>{e.passo ? "atualizou o texto do " : "atualizou a observação de "}</>}
                       {e.tipo === "correcao" && <>marcou como corrigido </>}
                       {e.tipo === "aceite" && <>concluiu a homologação.</>}
                       {e.tipo === "reabertura" && <>reabriu a homologação:</>}

@@ -5,7 +5,8 @@ import AceiteAdmin from "@/components/AceiteAdmin";
 import AdminBar from "@/components/AdminBar";
 import FerramentasPlanilha from "@/components/FerramentasPlanilha";
 import { ChipStatus } from "@/components/StatusBadge";
-import { btn, btn2, campo, Confirmar, CopiarLink } from "@/components/ui";
+import { btn, btn2, campo } from "@/components/estilos";
+import { Confirmar, CopiarLink } from "@/components/ui";
 import { exigirAdmin } from "@/lib/admin";
 import { consolidado } from "@/lib/consolidado";
 import { sql } from "@/lib/db";
@@ -31,6 +32,7 @@ const ERROS: Record<string, string> = {
   modulo: "Esse módulo não existe mais. Recarregue a página e confira a lista.",
   telas: "Escreva pelo menos um nome de tela (um por linha).",
   item: "Essa funcionalidade não existe mais. Recarregue a página e confira a lista.",
+  ambiente: "O endereço do ambiente de teste precisa começar com https:// (ou http://). Confira e salve de novo.",
   travado: "A homologação está concluída, então nada foi alterado ou apagado. Reabra a homologação (caixa “Aceite da homologação”) antes de mudar a estrutura.",
 };
 
@@ -233,7 +235,20 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                                     {t.titulo}
                                   </p>
                                   <p className="text-xs text-slate-600">
-                                    {t.imagem ? "Imagem ✓" : "Sem imagem"} · {t.pdf ? "PDF ✓" : t.itens.length > 0 ? "PDF gerado pela lista" : "Sem PDF"} · {t.link ? "Link ✓" : "Sem link"} · {t.itens.length} {t.itens.length === 1 ? "funcionalidade" : "funcionalidades"}
+                                    {t.imagem ? "Imagem ✓" : "Sem imagem"} · {t.pdf ? "PDF ✓" : t.itens.length > 0 ? "PDF gerado pela lista" : "Sem PDF"} · {t.itens.length} {t.itens.length === 1 ? "funcionalidade" : "funcionalidades"}
+                                  </p>
+                                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                                    {t.link ? (
+                                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-900 ring-1 ring-inset ring-emerald-300">Programada: o validador abre o link para testar</span>
+                                    ) : (
+                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-800 ring-1 ring-inset ring-slate-300">Só desenho: o validador revisa a imagem</span>
+                                    )}
+                                    {t.itens.length > 0 && (() => {
+                                      const sem = t.itens.filter((i) => !i.passos?.length).length;
+                                      return sem > 0
+                                        ? <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-950 ring-1 ring-inset ring-amber-300">Falta o roteiro detalhado em {sem} {sem === 1 ? "funcionalidade" : "funcionalidades"}</span>
+                                        : <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-900 ring-1 ring-inset ring-indigo-300">Roteiro completo</span>;
+                                    })()}
                                   </p>
                                   <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-700">
                                     <ChipStatus status={r.status} />
@@ -304,6 +319,11 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             {erro === "titulo" && <p role="alert" className="text-sm text-rose-800 sm:col-span-2">Escreva o nome do caderno.</p>}
             <label className="block text-sm font-medium">Versão<input name="versao" defaultValue={c.versao} className={campo} /></label>
             <label className="block text-sm font-medium">Preparado por<input name="preparado_por" defaultValue={c.preparado_por} className={campo} /></label>
+            <label className="block text-sm font-medium sm:col-span-2">
+              Endereço do ambiente de teste (opcional)
+              <input name="ambiente_url" type="url" defaultValue={c.ambiente_url ?? ""} placeholder="https://" className={campo} />
+              <span className="mt-1 block text-xs font-normal text-slate-600">Se preencher, o validador vê o botão “Abrir ambiente de teste” logo na entrada do caderno.</span>
+            </label>
             <label className="block text-sm font-medium sm:col-span-2">Antes de começar (um item por linha)<textarea name="antes" rows={3} defaultValue={c.antes} className={campo} /></label>
             <div className="sm:col-span-2"><button className={btn + " min-h-11"}>Salvar</button></div>
           </form>

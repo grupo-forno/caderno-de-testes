@@ -3,20 +3,30 @@ import { notFound } from "next/navigation";
 import AdminBar from "@/components/AdminBar";
 import { exigirAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
+import NovoLink from "@/components/NovoLink";
+import { Confirmar } from "@/components/ui";
 import { COR_RESULTADO, ROTULO_RESULTADO } from "@/lib/formatar";
+import type { Passo } from "@/lib/tipos";
+import { novoLinkDeValidador } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
 const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
 
-export default async function Page({ params }: PageProps<"/admin/[id]/respostas">) {
+export default async function Page({ params, searchParams }: PageProps<"/admin/[id]/respostas">) {
   await exigirAdmin();
   const { id } = await params;
+  const { novo, erro } = await searchParams;
   const [c] = await sql`select slug, titulo from cadernos where id::text = ${id}`;
   if (!c) notFound();
   const modulos = await sql`select id, titulo from modulos where caderno_id = ${id} order by ordem`;
   const todas = await sql`select id, titulo, modulo_id, pai_id, itens from telas where caderno_id = ${id} order by ordem`;
   const rs = await sql`select nome, email, item, resultado, obs, anexos from respostas_item where caderno = ${c.slug} order by nome, email`;
+
+  // respostas aos passos dos roteiros: por pessoa e passo
+  const rp = await sql`select email, passo, resultado, obs, anexos from respostas_passo where caderno = ${c.slug}`;
+  const porPasso = new Map(rp.map((x) => [`${x.email}|${x.passo}`, x]));
+  const comChave = new Set((await sql`select email from validadores where caderno = ${c.slug}`).map((x) => x.email as string));
 
   // por pessoa: resposta de cada funcionalidade (pela chave do item)
   const pessoas = new Map<string, { nome: string; email: string; porItem: Map<string, (typeof rs)[number]> }>();
@@ -43,6 +53,8 @@ export default async function Page({ params }: PageProps<"/admin/[id]/respostas"
         <h1 className="mt-2 text-2xl font-semibold">Respostas: {c.titulo}</h1>
         <Link href={`/admin/${id}/historico`} className={`inline-flex min-h-11 items-center text-sm text-indigo-800 underline ${FOCO}`}>Ver o histórico de mudanças</Link>
 
+        {typeof erro === "string" && erro === "validador" && <p role="alert" className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">Essa pessoa não usa link para continuar (só respondeu pelo modelo antigo), então não há link para gerar.</p>}
+
         {pessoas.size === 0 ? (
           <p className="mt-4 text-sm text-slate-700">Ninguém respondeu ainda. Quando o cliente começar, as respostas aparecem aqui.</p>
         ) : (
@@ -51,6 +63,14 @@ export default async function Page({ params }: PageProps<"/admin/[id]/respostas"
             return (
               <section key={p.email} className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
                 <h2 className="font-semibold">{p.nome} <span className="text-sm font-normal text-slate-700">{p.email}</span></h2>
+                {novo === p.email && <NovoLink slug={c.slug} nome={p.nome} />}
+                {comChave.has(p.email) && (
+                  <form action={novoLinkDeValidador.bind(null, id, p.email)} className="mt-1">
+                    <Confirmar texto={`Gerar um novo link para continuar para ${p.nome}? O link antigo deixa de funcionar. Faça isso se a pessoa perdeu o link ou se outra pessoa usou o e-mail dela.`} className={`min-h-11 rounded text-xs text-indigo-800 underline ${FOCO}`}>
+                      Gerar novo link para continuar
+                    </Confirmar>
+                  </form>
+                )}
                 <div className="mt-3 space-y-6">
                   {arvore.map(({ modulo, telas }) => (
                     <div key={modulo.id}>
@@ -63,7 +83,7 @@ export default async function Page({ params }: PageProps<"/admin/[id]/respostas"
                               {t.titulo}
                             </h4>
                             <ul className="mt-1 divide-y divide-slate-100">
-                              {(t.itens as { id: string; nome: string }[]).map((it) => {
+                              {(t.itens as { id: string; nome: string; passos?: Passo[] }[]).map((it) => {
                                 const r = p.porItem.get(it.id);
                                 const res = r?.resultado ?? "nao_testado";
                                 return (
@@ -72,8 +92,37 @@ export default async function Page({ params }: PageProps<"/admin/[id]/respostas"
                                       <span className="whitespace-pre-wrap text-sm font-medium">{it.nome}</span>
                                       <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${COR_RESULTADO[res]}`}>{ROTULO_RESULTADO[res]}</span>
                                     </div>
-                                    {r?.obs && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{r.obs}</p>}
-                                    {r && <Anexos anexos={r.anexos} />}
+                                    {it.passos?.length ? (
+                                      <ol className="mt-2 space-y-2">
+                                        {it.passos.map((ps, n) => {
+                                          const x = porPasso.get(`${p.email}|${ps.id}`);
+                                          return (
+                                            <li key={ps.id} className={`rounded-md border p-3 text-sm ${x?.resultado === "diferente" ? "border-rose-300 bg-rose-50" : x?.resultado === "nao_consegui" ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
+                                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                                <p className="font-semibold">Passo {n + 1}</p>
+                                                {x ? (
+                                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${COR_RESULTADO[x.resultado]}`}>{ROTULO_RESULTADO[x.resultado]}</span>
+                                                ) : (
+                                                  <span className="text-xs font-semibold text-slate-700">Sem resposta</span>
+                                                )}
+                                              </div>
+                                              <p className="mt-1 whitespace-pre-wrap"><span className="font-medium">O que fazer:</span> {ps.fazer}</p>
+                                              <p className="mt-1 whitespace-pre-wrap"><span className="font-medium">O que deveria acontecer:</span> {ps.esperado}</p>
+                                              {x && x.resultado !== "funcionou" && (
+                                                <p className="mt-1 whitespace-pre-wrap"><span className="font-medium">{x.resultado === "diferente" ? "O que o validador viu:" : "Por que não conseguiu testar:"}</span> {x.obs || "sem explicação"}</p>
+                                              )}
+                                              {x && x.resultado === "funcionou" && x.obs && <p className="mt-1 whitespace-pre-wrap"><span className="font-medium">Comentário:</span> {x.obs}</p>}
+                                              {x && <Anexos anexos={x.anexos} />}
+                                            </li>
+                                          );
+                                        })}
+                                      </ol>
+                                    ) : (
+                                      <>
+                                        {r?.obs && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{r.obs}</p>}
+                                        {r && <Anexos anexos={r.anexos} />}
+                                      </>
+                                    )}
                                     {r && (
                                       <Link href={`/admin/${id}/historico?item=${it.id}`} className={`inline-flex min-h-11 items-center text-xs text-indigo-800 underline ${FOCO}`}>
                                         Ver histórico

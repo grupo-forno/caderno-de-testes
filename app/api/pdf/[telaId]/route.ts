@@ -73,7 +73,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ telaId:
     y -= 4;
   }
 
-  const itens = (t.itens as { nome: string; faz: string; imagem?: string }[]) ?? [];
+  const itens = (t.itens as { nome: string; faz: string; imagem?: string; passos?: { fazer: string; esperado: string }[] }[]) ?? [];
   if (!itens.length) texto("Esta tela ainda está em preparação.", normal, 11);
   else {
     texto("O que cada item faz", negrito, 13);
@@ -83,6 +83,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ telaId:
     espaco(34);
     texto(it.nome, negrito, 11);
     texto(it.faz || "—", normal, 11, rgb(0.25, 0.25, 0.3), 12);
+    if (it.passos?.length) {
+      y -= 4;
+      texto("Roteiro de teste", negrito, 10, rgb(0.3, 0.25, 0.7), 12);
+      it.passos.forEach((p, n) => {
+        texto(`${n + 1}. O que fazer: ${p.fazer}`, normal, 10, rgb(0.1, 0.1, 0.15), 18);
+        texto(`O que deve acontecer: ${p.esperado}`, normal, 10, rgb(0.05, 0.35, 0.2), 26);
+      });
+    }
     if (it.imagem) {
       y -= 4;
       await desenharImagem(it.imagem, 320, 200);

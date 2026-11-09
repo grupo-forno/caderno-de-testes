@@ -5,9 +5,13 @@ export function dataHora(d: Date | string): string {
     .replace(", ", " ");
 }
 
-export const ROTULO_RESULTADO: Record<string, string> = { ok: "OK", nao_ok: "NÃO OK", nao_testado: "NÃO TESTADO" };
+// os três últimos são resultados de passo do roteiro
+export const ROTULO_RESULTADO: Record<string, string> = { ok: "OK", nao_ok: "NÃO OK", nao_testado: "NÃO TESTADO", funcionou: "Funcionou", diferente: "Deu diferente", nao_consegui: "Não consegui testar" };
 export const COR_RESULTADO: Record<string, string> = {
   ok: "bg-emerald-100 text-emerald-900 ring-emerald-300",
   nao_ok: "bg-rose-100 text-rose-900 ring-rose-300",
   nao_testado: "bg-slate-100 text-slate-700 ring-slate-300",
+  funcionou: "bg-emerald-100 text-emerald-900 ring-emerald-300",
+  diferente: "bg-rose-100 text-rose-900 ring-rose-300",
+  nao_consegui: "bg-amber-100 text-amber-950 ring-amber-400",
 };

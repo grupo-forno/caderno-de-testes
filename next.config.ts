@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // abrir o caderno pelo IP da rede local (celular ou outro computador) no modo dev; sem isto o Next bloqueia os scripts e os botões não funcionam
+  allowedDevOrigins: ["192.168.100.18"],
   /* config options here */
   turbopack: {
     rules: {

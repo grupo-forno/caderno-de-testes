@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdminBar from "@/components/AdminBar";
 import ImportarForm from "@/components/ImportarForm";
-import { btn2 } from "@/components/ui";
+import { btn2 } from "@/components/estilos";
 import { exigirAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
 

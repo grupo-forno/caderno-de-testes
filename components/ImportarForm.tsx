@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { confirmarImportacao, verificarImportacao } from "@/app/admin/importar-actions";
-import { btn, btn2 } from "@/components/ui";
+import { btn, btn2 } from "@/components/estilos";
 import { ESTADO_INICIAL, type Resumo } from "@/lib/importacao";
 
 const MAX_BYTES = 1_000_000;

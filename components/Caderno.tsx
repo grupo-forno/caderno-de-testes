@@ -2,16 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
+import Execucao, { idPasso, type PassoFila } from "@/components/Execucao";
+import Inicio from "@/components/Inicio";
 import MenuTelas from "@/components/MenuTelas";
 import ModuloView from "@/components/ModuloView";
 import Resumo from "@/components/Resumo";
 import { COR_ICONE, IconeStatus } from "@/components/StatusBadge";
 import TelaView, { OPCOES } from "@/components/TelaView";
 import { dataHora } from "@/lib/formatar";
+import { anexosDoItem, estadoPasso, observacaoDoItem, passoCompleto, resultadoDoItem, temRoteiro } from "@/lib/passos";
+import { usePassos } from "@/lib/usePassos";
 import { juntar, resumoTela, ROTULO_STATUS } from "@/lib/status";
 import type { Caderno as C, Evento, Item, Resp, Tela } from "@/lib/tipos";
 
-type Pessoa = { nome: string; email: string };
+type Pessoa = { nome: string; email: string; chave?: string }; // a chave prova quem é a pessoa; o e-mail digitado não prova
 type Aceite = { nome: string; criado: string; token: string | null }; // o termo só vem para quem aceitou
 type Fase = "inicio" | "carregando" | "erro" | "ok";
 
@@ -53,6 +57,10 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
   const [enviando, setEnviando] = useState<Record<string, number>>({});
   const [erroAnexo, setErroAnexo] = useState<{ id: string; msg: string } | null>(null);
   const [okAnexo, setOkAnexo] = useState<{ id: string; msg: string } | null>(null);
+  const [erroEntrada, setErroEntrada] = useState<string | null>(null);
+  const [entrando, setEntrando] = useState(false);
+  const cred = pessoa?.chave ? { caderno: slug, chave: pessoa.chave } : null;
+  const ps = usePassos(cred);
 
   // Sempre o valor mais novo, para os envios e o salvamento nunca partirem de um estado velho
   const respRef = useRef<Record<string, Resp>>({});
@@ -82,18 +90,43 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
   // telas na ordem do menu, para "anterior" e "próxima"
   const ordem = caderno.modulos.flatMap((m) => principaisDoModulo(m.id).flatMap((t) => [t, ...filhosDe(t.id)])).map((t) => ({ tela: t, numero: numeros[t.id] }));
 
-  const res = (id: string): Resp => (resp[id] ? { ...VAZIA, ...resp[id], anexos: resp[id].anexos ?? [] } : VAZIA);
+  // Funcionalidade com roteiro: o resultado vem dos passos. Sem roteiro (modelo antigo): da resposta direta.
+  const itensPorId = new Map(caderno.telas.flatMap((t) => t.itens.map((i) => [i.id, i] as const)));
+  const res = (id: string): Resp => {
+    const it = itensPorId.get(id);
+    if (it && temRoteiro(it)) {
+      const rp = (pid: string) => ps.resp[pid];
+      return { resultado: resultadoDoItem(it.passos, rp), obs: observacaoDoItem(it.passos, rp), anexos: anexosDoItem(it.passos, rp), severidade: null };
+    }
+    return resp[id] ? { ...VAZIA, ...resp[id], anexos: resp[id].anexos ?? [] } : VAZIA;
+  };
+  // todos os passos, na ordem do menu (módulo > tela > funcionalidade > passo)
+  const fila: PassoFila[] = [];
+  for (const { tela, numero } of ordem) {
+    const modulo = caderno.modulos.find((m) => m.id === tela.moduloId);
+    if (!modulo) continue;
+    for (const item of tela.itens) {
+      if (!temRoteiro(item)) continue;
+      item.passos.forEach((passo, n) => fila.push({ passo, indice: n + 1, total: item.passos.length, item, tela, numeroTela: numero, modulo, numeroModulo: numeros[modulo.id] }));
+    }
+  }
+  const posPasso = ativa.startsWith("p:") ? fila.findIndex((f) => idPasso(f.passo.id) === ativa) : -1;
+  const passoAtivo = posPasso >= 0 ? fila[posPasso] : null;
+  const respondidos = fila.filter((f) => passoCompleto(ps.resp[f.passo.id])).length;
+  const comProblema = fila.filter((f) => estadoPasso(ps.resp[f.passo.id]) === "diferente").length;
+  const bloqueados = fila.filter((f) => estadoPasso(ps.resp[f.passo.id]) === "bloqueado").length;
+  const todosItens = caderno.telas.flatMap((t) => t.itens);
   const resumos = Object.fromEntries(ordem.map(({ tela }) => [tela.id, resumoTela(tela, (id) => res(id).resultado)]));
   const telasDoModulo = (id: string) => principaisDoModulo(id).flatMap((t) => [t, ...filhosDe(t.id)]);
   const resumosMod = Object.fromEntries(caderno.modulos.map((m) => [m.id, juntar(telasDoModulo(m.id).map((t) => resumos[t.id]))]));
   const geral = juntar(ordem.map(({ tela }) => resumos[tela.id]));
-  const jaComecou = Object.values(resp).some((r) => r.resultado !== "nao_testado" || r.obs || r.anexos?.length);
+  const jaComecou = Object.keys(ps.resp).length > 0 || Object.values(resp).some((r) => r.resultado !== "nao_testado" || r.obs || r.anexos?.length);
 
   const idx = ordem.findIndex((o) => o.tela.id === ativa);
   const atual = idx >= 0 ? ordem[idx] : null;
   const moduloDaAtiva = caderno.modulos.find((m) => m.id === ativa) ?? null;
-  const moduloAtivo = atual ? atual.tela.moduloId : moduloDaAtiva?.id ?? null;
-  const nomeAtual = atual ? `${atual.numero} ${atual.tela.titulo}` : moduloDaAtiva ? `${numeros[moduloDaAtiva.id]} ${moduloDaAtiva.titulo}` : "Resumo geral";
+  const moduloAtivo = passoAtivo ? passoAtivo.modulo.id : atual ? atual.tela.moduloId : moduloDaAtiva?.id ?? null;
+  const nomeAtual = ativa === "inicio" ? "Início" : passoAtivo ? `Passo ${passoAtivo.indice} de ${passoAtivo.total} · ${passoAtivo.item.nome}` : atual ? `${atual.numero} ${atual.tela.titulo}` : moduloDaAtiva ? `${numeros[moduloDaAtiva.id]} ${moduloDaAtiva.titulo}` : "Resumo geral";
 
   function contar() {
     setOcupado(sujos.current.size - falhou.current.size);
@@ -102,14 +135,21 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
 
   // ---------- carregar ----------
   // Abre na tela do endereço (#id); senão na primeira tela que dá para testar e ainda não está finalizada
-  function telaInicial(r: Record<string, Resp>): string {
+  function telaInicial(): string {
     const h = window.location.hash.slice(1);
-    if (h === "resumo" || ordem.some((o) => o.tela.id === h) || caderno.modulos.some((m) => m.id === h)) return h;
+    if (h === "inicio" || h === "resumo" || fila.some((f) => idPasso(f.passo.id) === h) || ordem.some((o) => o.tela.id === h) || caderno.modulos.some((m) => m.id === h)) return h;
+    return "inicio"; // a entrada do caderno: o que será validado e o botão para começar ou continuar
+  }
+
+  // O que o botão principal da entrada faz: vai ao primeiro passo sem resposta; sem roteiro, abre a primeira tela que ainda dá para testar
+  function aoComecar() {
+    const pendente = fila.find((f) => !passoCompleto(ps.resp[f.passo.id])) ?? fila[0];
+    if (pendente) return ir(idPasso(pendente.passo.id));
     const aberta = ordem.find(({ tela }) => {
-      const s = resumoTela(tela, (id) => r[id]?.resultado ?? "nao_testado").status;
+      const s = resumoTela(tela, (id) => res(id).resultado).status;
       return s === "nao_iniciada" || s === "em_andamento";
     });
-    return aberta?.tela.id ?? ordem[0]?.tela.id ?? "resumo";
+    ir(aberta?.tela.id ?? ordem[0]?.tela.id ?? "resumo");
   }
 
   async function buscar(p: Pessoa) {
@@ -125,14 +165,25 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
     setFase("carregando");
     setMsgCarga(null);
     try {
-      const d = await buscar(p);
+      const [d, falhaPassos] = await Promise.all([buscar(p), ps.carregar(p.chave ? { caderno: slug, chave: p.chave } : undefined)]);
       if (g !== geracao.current) return;
+      if (falhaPassos?.invalida) {
+        // a chave guardada não vale mais: volta para a entrada, sem apagar nada do servidor
+        try {
+          localStorage.removeItem("pessoa");
+        } catch {}
+        setErroEntrada(falhaPassos.msg);
+        setPessoa(null);
+        setFase("ok");
+        return;
+      }
+      if (falhaPassos) throw new Error(falhaPassos.msg);
       focarAoCarregar.current = focar;
       respRef.current = d.respostas;
       setResp(d.respostas);
       setHistorico(d.historico);
       setAceite(d.aceite ?? null);
-      setAtiva(telaInicial(d.respostas));
+      setAtiva(telaInicial());
       setFase("ok");
     } catch (e) {
       if (g !== geracao.current) return;
@@ -155,17 +206,61 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
     }
   }
 
-  useEffect(() => {
-    let p: Pessoa | null = null;
+  // Entrar: cria a pessoa (ou confere a chave do link para continuar) e guarda a chave neste aparelho
+  async function identificar(entrada: { nome: string; email: string } | { chave: string }): Promise<{ p: Pessoa } | { erro: string }> {
     try {
-      const guardada = JSON.parse(localStorage.getItem("pessoa") ?? "null");
-      if (guardada?.nome && guardada?.email) p = { nome: String(guardada.nome), email: String(guardada.email) };
-    } catch {}
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setPessoa(p);
-    if (!p) setFase("ok");
-    /* eslint-enable react-hooks/set-state-in-effect */
-    if (p) void carregar(p);
+      const r = await fetch("/api/validador", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caderno: slug, ...entrada }),
+        signal: AbortSignal.timeout(TEMPO),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.nome) return { erro: j?.erro ?? "Não conseguimos entrar agora. Confira sua internet e tente de novo." };
+      const chave: string = "chave" in entrada ? entrada.chave : j.chave;
+      const p: Pessoa = { nome: j.nome, email: j.email, chave };
+      try {
+        localStorage.setItem("pessoa", JSON.stringify(p));
+      } catch {}
+      return { p };
+    } catch (e) {
+      return { erro: demorou(e) ? MSG_DEMOROU : "Não conseguimos entrar agora. Confira sua internet e tente de novo." };
+    }
+  }
+
+  useEffect(() => {
+    void (async () => {
+      let p: Pessoa | null = null;
+      try {
+        const guardada = JSON.parse(localStorage.getItem("pessoa") ?? "null");
+        if (guardada?.nome && guardada?.email) p = { nome: String(guardada.nome), email: String(guardada.email), chave: guardada.chave ? String(guardada.chave) : undefined };
+      } catch {}
+      // link para continuar (#k=chave): vale para esta pessoa e sai do endereço logo depois de lido
+      const k = window.location.hash.match(/^#k=([\w-]+)$/)?.[1];
+      if (k) {
+        try {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        } catch {}
+        const r = await identificar({ chave: k });
+        if ("p" in r) p = r.p;
+        else setErroEntrada(r.erro);
+      }
+      // pessoa guardada de antes do roteiro (sem chave): pega uma chave agora; se o e-mail já tem dono, volta para a entrada
+      if (p && !p.chave) {
+        const r = await identificar({ nome: p.nome, email: p.email });
+        if ("p" in r) p = r.p;
+        else {
+          setErroEntrada(r.erro);
+          try {
+            localStorage.removeItem("pessoa");
+          } catch {}
+          p = null;
+        }
+      }
+      setPessoa(p);
+      if (!p) setFase("ok");
+      else void carregar(p);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -177,18 +272,23 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
     }
   }, [fase]);
 
-  function entrar(p: Pessoa) {
+  async function entrar(dados: { nome: string; email: string }) {
+    setErroEntrada(null);
+    setEntrando(true);
+    const r = await identificar(dados);
+    setEntrando(false);
+    if ("erro" in r) return setErroEntrada(r.erro);
     geracao.current++;
-    try {
-      localStorage.setItem("pessoa", JSON.stringify(p));
-    } catch {}
     setTrocou(false);
-    setPessoa(p);
-    void carregar(p, true);
+    setPessoa(r.p);
+    void carregar(r.p, true);
   }
 
   function trocarPessoa() {
-    if (sujos.current.size > 0 && !confirm("Ainda há respostas sem salvar. Trocar de pessoa agora pode perdê-las. Trocar mesmo assim?")) return;
+    if ((sujos.current.size > 0 || ps.semSalvar() > 0) && !confirm("Ainda há respostas sem salvar. Trocar de pessoa agora pode perdê-las. Trocar mesmo assim?")) return;
+    if (pessoa?.chave && !confirm("Para voltar depois como você, vai precisar do link para continuar (está na página inicial do caderno). Já guardou? Trocar de pessoa agora?")) return;
+    ps.limpar();
+    setErroEntrada(null);
     geracao.current++; // o que estava em andamento para a pessoa anterior para de valer
     for (const t of Object.values(timers.current)) clearTimeout(t);
     timers.current = {};
@@ -311,7 +411,7 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
   }
 
   function mudar(tela: Tela, item: Item, patch: Partial<Resp>) {
-    if (aceite) return; // depois do aceite nada muda
+    if (aceite || temRoteiro(item)) return; // depois do aceite nada muda
     const nova: Resp = { ...VAZIA, ...respRef.current[item.id], ...patch };
     if (nova.resultado !== "nao_ok") nova.severidade = null; // a gravidade só vale para NÃO OK
     respRef.current = { ...respRef.current, [item.id]: nova };
@@ -447,7 +547,22 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
   }, []);
 
   if (fase === "inicio") return null;
-  if (!pessoa) return <Entrada titulo={caderno.titulo} onEntrar={entrar} focarNome={trocou} />;
+  if (!pessoa) return <Entrada titulo={caderno.titulo} onEntrar={entrar} focarNome={trocou} erro={erroEntrada} ocupado={entrando} />;
+
+  // salvamento: junta o modelo antigo (resultado direto) e os passos do roteiro
+  const bloqueioT = bloqueio ?? ps.bloqueio;
+  const falhasT = falhas + ps.falhas;
+  const ocupadoT = ocupado + ps.ocupado;
+  const salvoT = [salvo, ps.salvo].filter(Boolean).sort().pop() ?? null;
+  const textoSalvamento: { texto: string; tipo: "ok" | "salvando" | "erro" } = bloqueioT
+    ? { texto: "Recarregue a página para continuar", tipo: "erro" }
+    : falhasT > 0
+      ? { texto: "Há respostas sem salvar. Elas continuam na tela: confira a internet e tente salvar de novo", tipo: "erro" }
+      : ocupadoT > 0
+        ? { texto: "Salvando…", tipo: "salvando" }
+        : { texto: salvoT ? `Salvo às ${salvoT}` : "Suas respostas são salvas sozinhas", tipo: "ok" };
+  const somenteLeitura = !!aceite || !!ps.concluido;
+  const linkParaContinuar = pessoa.chave ? `${window.location.origin}/c/${slug}#k=${pessoa.chave}` : null;
 
   const cabecalho = (
     <header className="border-b border-slate-200 bg-white print:border-0">
@@ -462,10 +577,14 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
         </div>
         <div className="text-xs text-slate-700 print:hidden">
           <p aria-live="polite">
-            {bloqueio ? "Recarregue a página para continuar" : falhas > 0 ? "Há respostas sem salvar" : ocupado > 0 ? "Salvando…" : salvo ? `Salvo às ${salvo}` : "Suas respostas são salvas sozinhas"}
+            {textoSalvamento.texto}
           </p>
           <p className="mt-0.5">
             {pessoa.nome} ·{" "}
+            <button type="button" onClick={() => ir("inicio")} className={`rounded underline ${FOCO}`}>
+              Início
+            </button>{" "}
+            ·{" "}
             <button type="button" onClick={trocarPessoa} className={`rounded underline ${FOCO}`}>
               Não é você? Trocar
             </button>
@@ -520,7 +639,7 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
       resumos={resumos}
       resumosMod={resumosMod}
       geral={geral}
-      ativa={ativa}
+      ativa={passoAtivo ? passoAtivo.tela.id : ativa}
       moduloAtivo={moduloAtivo}
       aoIr={ir}
       abertos={abertos}
@@ -563,9 +682,9 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
             </button>
           </div>
 
-          {bloqueio && (
+          {bloqueioT && (
             <div role="alert" className="mb-3 rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950">
-              <p className="font-semibold">{bloqueio}</p>
+              <p className="font-semibold">{bloqueioT}</p>
               <p className="mt-1">As respostas já salvas continuam lá. Alterações que ainda não tinham sido salvas serão perdidas ao recarregar.</p>
               <button type="button" onClick={() => window.location.reload()} className={`mt-2 min-h-11 rounded-md bg-rose-700 px-4 text-sm font-medium text-white hover:bg-rose-800 ${FOCO}`}>
                 Recarregar a página
@@ -573,13 +692,13 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
             </div>
           )}
 
-          {falhas > 0 && !bloqueio && (
+          {falhasT > 0 && !bloqueioT && (
             <div role="alert" className="mb-3 rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950">
               <p className="font-semibold">
-                {falhas === 1 ? "1 resposta ainda não foi salva." : `${falhas} respostas ainda não foram salvas.`}
+                {falhasT === 1 ? "1 resposta ainda não foi salva." : `${falhasT} respostas ainda não foram salvas.`}
               </p>
               <p className="mt-1">Elas continuam aqui na tela. Confira sua internet e tente de novo. Não feche a página antes disso.</p>
-              <button type="button" onClick={tentarDeNovo} className={`mt-2 min-h-11 rounded-md bg-rose-700 px-4 text-sm font-medium text-white hover:bg-rose-800 ${FOCO}`}>
+              <button type="button" onClick={() => { tentarDeNovo(); ps.tentarDeNovo(); }} className={`mt-2 min-h-11 rounded-md bg-rose-700 px-4 text-sm font-medium text-white hover:bg-rose-800 ${FOCO}`}>
                 Tentar salvar de novo
               </button>
             </div>
@@ -597,6 +716,13 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
             </div>
           )}
 
+          {ps.concluido && !aceite && (
+            <div role="status" className="mb-3 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+              <p className="font-semibold">{ps.concluido}</p>
+              <p className="mt-1">Para mudar algo, peça a quem preparou o caderno para reabrir.</p>
+            </div>
+          )}
+
           {avisoPerda && (
             <div role="alert" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               {avisoPerda}
@@ -607,6 +733,7 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
             <strong>Ambiente de homologação.</strong> Isto é um teste: nada do que você fizer aqui afeta o sistema real.
           </div>
 
+          {ativa !== "inicio" && !passoAtivo && (
           <details open={!jaComecou} className="mt-3 rounded-lg border border-slate-200 bg-white">
             <summary className={`flex min-h-11 cursor-pointer items-center rounded-lg px-4 text-sm font-semibold ${FOCO}`}>Como usar este caderno</summary>
             <div className="border-t border-slate-100 px-4 py-3 text-sm text-slate-700">
@@ -625,9 +752,46 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
               )}
             </div>
           </details>
+          )}
 
           <div className="mt-6">
-            {atual ? (
+            {ativa === "inicio" ? (
+              <Inicio
+                titulo={caderno.titulo}
+                versao={caderno.versao}
+                preparadoPor={caderno.preparadoPor}
+                ambienteUrl={caderno.ambienteUrl}
+                antesDeComecar={caderno.antesDeComecar}
+                contagem={{
+                  modulos: caderno.modulos.length,
+                  telas: caderno.telas.length,
+                  funcionalidades: todosItens.length,
+                  passos: fila.length,
+                  semRoteiro: todosItens.filter((i) => !temRoteiro(i)).length,
+                  desenhos: caderno.telas.filter((t) => t.itens.length > 0 && !t.link).length,
+                  programadas: caderno.telas.filter((t) => t.itens.length > 0 && !!t.link).length,
+                }}
+                progresso={{ respondidos, comProblema, bloqueados, iniciou: jaComecou }}
+                linkParaContinuar={linkParaContinuar}
+                aoComecar={aoComecar}
+                aoVerTelas={() => ir(ordem[0]?.tela.id ?? "resumo")}
+              />
+            ) : passoAtivo ? (
+              <Execucao
+                key={passoAtivo.passo.id}
+                atual={passoAtivo}
+                fila={fila}
+                posicao={posPasso}
+                resp={ps.resp}
+                chave={pessoa.chave ?? ""}
+                slug={slug}
+                somenteLeitura={somenteLeitura}
+                salvamento={textoSalvamento}
+                aoMudar={ps.mudar}
+                aoIr={ir}
+                aoSair={() => ir("inicio")}
+              />
+            ) : atual ? (
               <TelaView
                 key={atual.tela.id}
                 tela={atual.tela}
@@ -645,7 +809,8 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
                 enviando={enviando}
                 erroAnexo={erroAnexo}
                 okAnexo={okAnexo}
-                somenteLeitura={!!aceite}
+                somenteLeitura={somenteLeitura}
+                respPassos={ps.resp}
               />
             ) : moduloDaAtiva ? (
               <ModuloView
@@ -658,7 +823,7 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
                 aoIr={ir}
               />
             ) : (
-              <Resumo modulos={modulosResumo} resumos={resumos} geral={geral} res={res} aoIr={ir} pendentes={ocupado} falhas={falhas} bloqueado={!!bloqueio} pessoa={pessoa} aceite={aceite} aoConcluir={concluir} />
+              <Resumo modulos={modulosResumo} resumos={resumos} geral={geral} res={res} aoIr={ir} pendentes={ocupadoT} falhas={falhasT} bloqueado={!!bloqueioT} pessoa={pessoa} aceite={aceite} aoConcluir={concluir} />
             )}
           </div>
         </main>
@@ -725,7 +890,7 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
   );
 }
 
-function Entrada({ titulo, onEntrar, focarNome }: { titulo: string; onEntrar: (p: Pessoa) => void; focarNome: boolean }) {
+function Entrada({ titulo, onEntrar, focarNome, erro, ocupado }: { titulo: string; onEntrar: (p: { nome: string; email: string }) => void; focarNome: boolean; erro: string | null; ocupado: boolean }) {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const nomeRef = useRef<HTMLInputElement>(null);
@@ -740,7 +905,7 @@ function Entrada({ titulo, onEntrar, focarNome }: { titulo: string; onEntrar: (p
     <main className="mx-auto max-w-md px-4 py-10 sm:py-16">
       <h1 className="text-balance text-2xl font-semibold">{titulo}</h1>
       <p className="mt-2 text-sm text-slate-700">
-        Para começar, diga quem é você. Assim suas respostas ficam salvas e você pode continuar depois, em qualquer aparelho, com o mesmo e-mail.
+        Para começar, diga quem é você. Suas respostas ficam salvas sozinhas. Para continuar depois em outro aparelho, você vai receber um link para continuar; só quem tem o link vê e muda as suas respostas.
       </p>
       <form
         className="mt-6 space-y-4 rounded-lg border border-slate-200 bg-white p-5"
@@ -757,7 +922,8 @@ function Entrada({ titulo, onEntrar, focarNome }: { titulo: string; onEntrar: (p
           Seu e-mail <span className="font-normal text-slate-600">(obrigatório)</span>
           <input required type="email" inputMode="email" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className={campo} />
         </label>
-        <button className={`min-h-11 w-full rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>Começar</button>
+        {erro && <p role="alert" className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-950">{erro}</p>}
+        <button disabled={ocupado} className={`min-h-11 w-full rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 ${FOCO}`}>{ocupado ? "Entrando…" : "Continuar"}</button>
       </form>
     </main>
   );

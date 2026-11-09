@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { btn2 } from "@/components/ui";
+import { btn2 } from "@/components/estilos";
 
 // Aviso depois de importar. Fica aqui dentro para a página do caderno não precisar mudar.
 function Aviso() {

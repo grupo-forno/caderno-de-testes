@@ -2,10 +2,13 @@
 
 import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
-import { btn, btn2, campo } from "@/components/ui";
+import { btn, btn2, campo } from "@/components/estilos";
 
-type Item = { id?: string; nome: string; faz: string; imagem?: string };
-type ItemLocal = Item & { k: number }; // k só serve para o React não misturar os itens ao remover um
+type Passo = { id?: string; fazer: string; esperado: string };
+type PassoLocal = Passo & { k: number };
+type Item = { id?: string; nome: string; faz: string; imagem?: string; passos?: Passo[] };
+// k só serve para o React não misturar os itens (e os passos) ao remover um
+type ItemLocal = Omit<Item, "passos"> & { k: number; passos: PassoLocal[] };
 type Inicial = { titulo: string; imagem: string | null; link: string | null; pdf: string | null; itens: Item[]; paiId: string | null; moduloId: string };
 
 function Arquivo({ nome, rotulo, substantivo, accept, limiteMb, inicial }: { nome: string; rotulo: string; substantivo: string; accept: string; limiteMb: number; inicial: string | null }) {
@@ -85,12 +88,14 @@ function Arquivo({ nome, rotulo, substantivo, accept, limiteMb, inicial }: { nom
 }
 
 let proxK = 0;
-const novoItem = (i?: Item): ItemLocal => ({ nome: "", faz: "", ...i, k: proxK++ });
+const novoPasso = (p?: Passo): PassoLocal => ({ fazer: "", esperado: "", ...p, k: proxK++ });
+const novoItem = (i?: Item): ItemLocal => ({ nome: "", faz: "", ...i, passos: (i?.passos ?? []).map((p) => novoPasso(p)), k: proxK++ });
 
 const MENSAGEM_ERRO: Record<string, string> = {
   titulo: "Escreva o nome da tela.",
   pai: "Não foi possível ligar este pop-up à tela escolhida. Escolha outra tela principal.",
   modulo: "Escolha o módulo da tela. Se ainda não existe nenhum, volte ao caderno e crie os módulos primeiro.",
+  passo: "Algum passo do roteiro está incompleto. Cada passo precisa dos dois campos: “O que fazer” e “O que deve acontecer”. Preencha ou remova o passo.",
   url: "Um dos endereços não é aceito. O link da tela deve começar com https:// e as imagens e PDFs devem ser enviados pelo botão “Escolher”, não colados.",
 };
 
@@ -110,7 +115,16 @@ export default function TelaForm({
   const [pai, setPai] = useState(inicial.paiId ?? principais[0]?.id ?? "");
   const [programada, setProgramada] = useState(!!inicial.link);
   const [pdfProprio, setPdfProprio] = useState(!!inicial.pdf);
-  const mudar = (k: number, p: Partial<Item>) => setItens(itens.map((x) => (x.k === k ? { ...x, ...p } : x)));
+  const mudar = (k: number, p: Partial<ItemLocal>) => setItens(itens.map((x) => (x.k === k ? { ...x, ...p } : x)));
+  const mudarPasso = (k: number, pk: number, p: Partial<Passo>) => setItens(itens.map((x) => (x.k === k ? { ...x, passos: x.passos.map((s) => (s.k === pk ? { ...s, ...p } : s)) } : x)));
+  const moverPasso = (k: number, de: number, dir: -1 | 1) =>
+    setItens(itens.map((x) => {
+      const para = de + dir;
+      if (x.k !== k || para < 0 || para >= x.passos.length) return x;
+      const l = [...x.passos];
+      [l[de], l[para]] = [l[para], l[de]];
+      return { ...x, passos: l };
+    }));
   const podeSerPopup = !temFilhos && principais.length > 0;
 
   return (
@@ -157,10 +171,10 @@ export default function TelaForm({
 
       {!ehPopup && (
         <fieldset>
-          <legend className="text-sm font-medium">Tela programada?</legend>
-          <div className="mt-2 flex gap-5 text-sm">
-            <label className="flex items-center gap-2"><input type="radio" name="programada" checked={programada} onChange={() => setProgramada(true)} /> Sim</label>
-            <label className="flex items-center gap-2"><input type="radio" name="programada" checked={!programada} onChange={() => setProgramada(false)} /> Não, é só desenho</label>
+          <legend className="text-sm font-medium">Esta tela já existe em código?</legend>
+          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            <label className="flex items-center gap-2"><input type="radio" name="programada" checked={programada} onChange={() => setProgramada(true)} /> Sim, está programada (o validador testa de verdade)</label>
+            <label className="flex items-center gap-2"><input type="radio" name="programada" checked={!programada} onChange={() => setProgramada(false)} /> Não, é só um desenho (o validador revisa a imagem)</label>
           </div>
           {programada && (
             <label className="mt-3 block text-sm font-medium">
@@ -176,7 +190,7 @@ export default function TelaForm({
       <fieldset>
         <legend className="text-sm font-medium">O que cada item da tela faz</legend>
         <p className="text-xs text-slate-600">
-          Cada item é uma funcionalidade (campo, botão, área...) e o que acontece quando a pessoa usa. O cliente dá um resultado para cada uma (OK, NÃO OK ou NÃO TESTADO), e é com esta lista que o PDF das funcionalidades é gerado sozinho. Se um item abre um pop-up ou muda a tela, dá para juntar uma imagem a ele. Pode deixar a lista vazia por enquanto: a tela aparece no menu como “Em preparação” até você cadastrar as funcionalidades.
+          Cada item é uma funcionalidade (campo, botão, área...) e o que acontece quando a pessoa usa. A descrição serve de referência. Para a pessoa conseguir testar sozinha, escreva também o roteiro de teste, passo a passo; ela responde cada passo e o resultado da funcionalidade é calculado sozinho. É com esta lista que o PDF das funcionalidades é gerado. Se um item abre um pop-up ou muda a tela, dá para juntar uma imagem a ele. Pode deixar a lista vazia por enquanto: a tela aparece no menu como “Em preparação” até você cadastrar as funcionalidades.
         </p>
         <div className="mt-3 space-y-3">
           {itens.map((it) => (
@@ -187,10 +201,43 @@ export default function TelaForm({
                 <textarea name="itemNome" rows={2} value={it.nome} onChange={(e) => mudar(it.k, { nome: e.target.value })} placeholder="Ex.: Botão Salvar, Campo Nome, Área de filtros" className={campo + " field-sizing-content min-h-14 resize-y text-slate-900"} />
               </label>
               <label className="block text-xs font-medium text-slate-600">
-                O que faz
+                O que faz (descrição de referência)
                 <textarea name="itemFaz" rows={2} value={it.faz} onChange={(e) => mudar(it.k, { faz: e.target.value })} placeholder="Ex.: Grava o cadastro e volta para a lista" className={campo + " field-sizing-content min-h-14 resize-y text-slate-900"} />
               </label>
               <button type="button" onClick={() => setItens(itens.filter((x) => x.k !== it.k))} className="self-start text-sm text-slate-600 underline sm:mt-5">Remover</button>
+              <fieldset className="rounded-md border border-slate-200 bg-slate-50 p-3 sm:col-span-3">
+                <legend className="px-1 text-sm font-semibold">Roteiro de teste</legend>
+                <input type="hidden" name="itemPassos" value={JSON.stringify(it.passos.map(({ id, fazer, esperado }) => ({ id, fazer, esperado })))} />
+                <p className="text-xs text-slate-600">Passo a passo para outra pessoa testar sozinha. Cada passo diz o que fazer e o que ela deve ver acontecer.</p>
+                {it.passos.length === 0 && (
+                  <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                    <strong>Falta escrever o roteiro detalhado.</strong> Sem passos, o validador só vê a descrição acima e responde OK, NÃO OK ou NÃO TESTADO como antes.
+                  </p>
+                )}
+                <ol className="mt-3 space-y-3">
+                  {it.passos.map((p, n) => (
+                    <li key={p.k} className="rounded-md border border-slate-200 bg-white p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold">Passo {n + 1}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button type="button" disabled={n === 0} onClick={() => moverPasso(it.k, n, -1)} aria-label={`Subir o passo ${n + 1}`} className={btn2 + " min-h-11 px-3 disabled:opacity-30"}>↑</button>
+                          <button type="button" disabled={n === it.passos.length - 1} onClick={() => moverPasso(it.k, n, 1)} aria-label={`Descer o passo ${n + 1}`} className={btn2 + " min-h-11 px-3 disabled:opacity-30"}>↓</button>
+                          <button type="button" onClick={() => mudar(it.k, { passos: it.passos.filter((s) => s.k !== p.k) })} className="min-h-11 px-2 text-sm text-slate-600 underline">Remover<span className="sr-only"> o passo {n + 1}</span></button>
+                        </div>
+                      </div>
+                      <label className="mt-2 block text-xs font-medium text-slate-600">
+                        O que fazer <span className="font-normal">(obrigatório)</span>
+                        <textarea required rows={2} maxLength={2000} value={p.fazer} onChange={(e) => mudarPasso(it.k, p.k, { fazer: e.target.value })} placeholder="Ex.: Clique em Novo cadastro, preencha o nome e clique em Salvar" className={campo + " field-sizing-content min-h-14 resize-y text-slate-900"} />
+                      </label>
+                      <label className="mt-2 block text-xs font-medium text-slate-600">
+                        O que deve acontecer <span className="font-normal">(obrigatório)</span>
+                        <textarea required rows={2} maxLength={2000} value={p.esperado} onChange={(e) => mudarPasso(it.k, p.k, { esperado: e.target.value })} placeholder="Ex.: A tela volta para a lista e o novo cadastro aparece no topo" className={campo + " field-sizing-content min-h-14 resize-y text-slate-900"} />
+                      </label>
+                    </li>
+                  ))}
+                </ol>
+                <button type="button" onClick={() => mudar(it.k, { passos: [...it.passos, novoPasso()] })} className={btn2 + " mt-3 min-h-11"}>Adicionar passo</button>
+              </fieldset>
               <div className="sm:col-span-3">
                 <Arquivo nome="itemImagem" rotulo="Imagem deste item (opcional)" substantivo="imagem" accept="image/png,image/jpeg,image/webp" limiteMb={10} inicial={it.imagem ?? null} />
               </div>

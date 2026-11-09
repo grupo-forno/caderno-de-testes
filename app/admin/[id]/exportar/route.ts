@@ -2,7 +2,8 @@ import { ehAdmin } from "@/lib/admin";
 import { gerarCsv } from "@/lib/csv";
 import { sql } from "@/lib/db";
 import { dataHora, ROTULO_RESULTADO } from "@/lib/formatar";
-import { ROTULO_SEVERIDADE, type Severidade } from "@/lib/tipos";
+import { ROTULO_PASSO } from "@/lib/passos";
+import { ROTULO_SEVERIDADE, type Passo, type ResultadoPasso, type Severidade } from "@/lib/tipos";
 
 const ehUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const texto = (s: string, status: number) => new Response(s, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
@@ -21,6 +22,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const telas = await sql`select id, modulo_id, titulo, pai_id, itens from telas where caderno_id = ${id} order by ordem`;
   const respostas = await sql`select item, nome, email, resultado, severidade, obs, anexos, atualizado from respostas_item where caderno = ${c.slug} order by nome, email`;
 
+  const respostasPasso = await sql`select email, passo, resultado, obs from respostas_passo where caderno = ${c.slug}`;
+  const porPasso = new Map(respostasPasso.map((x) => [`${x.email}|${x.passo}`, x]));
+
   const porItem = new Map<string, Resposta[]>();
   for (const r of respostas) {
     const l = porItem.get(r.item as string) ?? [];
@@ -28,23 +32,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     porItem.set(r.item as string, l);
   }
 
-  const linhas: string[][] = [["Módulo", "Tela", "Pop-up de", "Funcionalidade", "O que faz", "Pessoa", "E-mail", "Resultado", "Gravidade", "Observação", "Prints", "Atualizado em"]];
+  const linhas: string[][] = [["Módulo", "Tela", "Pop-up de", "Funcionalidade", "O que faz", "Pessoa", "E-mail", "Resultado", "Gravidade", "Observação", "Prints", "Atualizado em", "Roteiro de teste", "Resultado dos passos"]];
   for (const m of modulos) {
     // cada tela principal seguida dos pop-ups dela
     const doModulo = telas.filter((t) => t.modulo_id === m.id);
     const ordem = doModulo.filter((t) => !t.pai_id).flatMap((t) => [t, ...doModulo.filter((f) => f.pai_id === t.id)]);
     for (const t of ordem) {
       const pai = t.pai_id ? (telas.find((x) => x.id === t.pai_id)?.titulo ?? "") : "";
-      const itens = (t.itens ?? []) as { id: string; nome: string; faz: string }[];
+      const itens = (t.itens ?? []) as { id: string; nome: string; faz: string; passos?: Passo[] }[];
       if (!itens.length) {
-        linhas.push([m.titulo, t.titulo, pai, "", "", "", "", "EM PREPARAÇÃO", "", "", "", ""]);
+        linhas.push([m.titulo, t.titulo, pai, "", "", "", "", "EM PREPARAÇÃO", "", "", "", "", "", ""]);
         continue;
       }
       for (const i of itens) {
         const base = [m.titulo, t.titulo, pai, i.nome, i.faz ?? ""];
+        const roteiro = (i.passos ?? []).map((p, n) => `${n + 1}) ${p.fazer} → ${p.esperado}`).join("\n");
         const rs = porItem.get(i.id);
         if (!rs?.length) {
-          linhas.push([...base, "", "", ROTULO_RESULTADO.nao_testado, "", "", "", ""]);
+          linhas.push([...base, "", "", ROTULO_RESULTADO.nao_testado, "", "", "", "", roteiro, ""]);
           continue;
         }
         for (const r of rs) {
@@ -57,6 +62,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
             r.obs,
             r.anexos.join(" "),
             dataHora(r.atualizado),
+            roteiro,
+            (i.passos ?? [])
+              .map((p, n) => {
+                const x = porPasso.get(`${r.email}|${p.id}`);
+                return `${n + 1}) ${x ? ROTULO_PASSO[x.resultado as ResultadoPasso] + (x.obs ? `: ${x.obs}` : "") : "Sem resposta"}`;
+              })
+              .join("\n"),
           ]);
         }
       }

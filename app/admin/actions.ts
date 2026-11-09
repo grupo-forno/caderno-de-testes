@@ -5,7 +5,9 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
+import { lerPassos } from "@/lib/passos";
 import type { Item } from "@/lib/tipos";
+import { hashDaChave, novaChave } from "@/lib/validador";
 import { aceiteVigente } from "@/lib/aceite";
 import { exigirAdmin, marcarEntrada, sairDoAdmin, senhaCorreta } from "@/lib/admin";
 
@@ -66,7 +68,10 @@ export async function salvarCaderno(id: string, f: FormData) {
   await exigirAdmin();
   const titulo = txt(f, "titulo");
   if (!titulo) redirect(`/admin/${id}?erro=titulo`);
-  await sql`update cadernos set titulo = ${titulo}, versao = ${txt(f, "versao") || "1.0"}, preparado_por = ${txt(f, "preparado_por")}, antes = ${txt(f, "antes")}, atualizado = now() where id = ${id}`;
+  // endereço do ambiente de teste: opcional, só http(s)
+  const ambiente = opc(f, "ambiente_url");
+  if (ambiente && !/^https?:$/.test((() => { try { return new URL(ambiente).protocol; } catch { return ""; } })())) redirect(`/admin/${id}?erro=ambiente`);
+  await sql`update cadernos set titulo = ${titulo}, versao = ${txt(f, "versao") || "1.0"}, preparado_por = ${txt(f, "preparado_por")}, antes = ${txt(f, "antes")}, ambiente_url = ${ambiente}, atualizado = now() where id = ${id}`;
   redirect(`/admin/${id}?salvo=1`);
 }
 
@@ -81,6 +86,8 @@ export async function excluirCaderno(id: string) {
       sql`delete from respostas_item where caderno = ${c.slug}`,
       sql`delete from aceites where caderno = ${c.slug}`, // termos: nome, e-mail e IP de quem aceitou
       sql`delete from respostas where caderno = ${c.slug}`, // tabela antiga, por tela
+      sql`delete from respostas_passo where caderno = ${c.slug}`, // respostas aos passos do roteiro
+      sql`delete from validadores where caderno = ${c.slug}`, // nome, e-mail e chave de quem validou
       sql`delete from cadernos where id = ${id}`, // apaga junto os módulos e as telas
     ]);
   }
@@ -126,6 +133,7 @@ export async function excluirModulo(cadernoId: string, moduloId: string) {
     await sql.transaction([
       sql`delete from historico where caderno = ${c.slug} and item in (select e->>'id' from telas t, jsonb_array_elements(t.itens) e where t.modulo_id = ${moduloId} and t.caderno_id = ${cadernoId})`,
       sql`delete from respostas_item where caderno = ${c.slug} and item in (select e->>'id' from telas t, jsonb_array_elements(t.itens) e where t.modulo_id = ${moduloId} and t.caderno_id = ${cadernoId})`,
+      sql`delete from respostas_passo where caderno = ${c.slug} and item in (select e->>'id' from telas t, jsonb_array_elements(t.itens) e where t.modulo_id = ${moduloId} and t.caderno_id = ${cadernoId})`,
       sql`delete from modulos where id = ${moduloId} and caderno_id = ${cadernoId}`, // apaga junto as telas
     ]);
   }
@@ -160,15 +168,24 @@ export async function salvarTela(cadernoId: string, telaId: string | null, f: Fo
   const fazs = f.getAll("itemFaz").map(String);
   const imagens = f.getAll("itemImagem").map(String);
   const ids = f.getAll("itemId").map(String);
-  // cada item mantém o id (é a chave das respostas) e ganha um novo se for item novo
+  const roteiros = f.getAll("itemPassos").map(String);
+  // cada item mantém o id (é a chave das respostas) e ganha um novo se for item novo.
+  // Os passos do roteiro também mantêm o id. Cada passo precisa de "O que fazer" e "O que deve acontecer".
+  let roteiroInvalido = false;
   const itens: Item[] = nomes
-    .map((nome, i) => ({
-      id: ehUuid(ids[i] ?? "") ? ids[i] : randomUUID(),
-      nome: nome.trim(),
-      faz: (fazs[i] ?? "").trim(),
-      ...(imagens[i] ? { imagem: imagens[i] } : {}),
-    }))
+    .map((nome, i) => {
+      const passos = lerPassos(roteiros[i] ?? "", randomUUID, ehUuid);
+      if (passos === null && nome.trim()) roteiroInvalido = true;
+      return {
+        id: ehUuid(ids[i] ?? "") ? ids[i] : randomUUID(),
+        nome: nome.trim(),
+        faz: (fazs[i] ?? "").trim(),
+        ...(imagens[i] ? { imagem: imagens[i] } : {}),
+        ...(passos?.length ? { passos } : {}),
+      };
+    })
     .filter((i) => i.nome);
+  if (roteiroInvalido) redirect(`/admin/${cadernoId}/tela/${telaId ?? "nova"}?erro=passo`);
 
   // Pop-up: a tela pai tem que ser uma tela principal do mesmo caderno, e uma tela que já tem pop-ups não pode virar pop-up.
   // O pop-up sempre fica no módulo da tela pai. Tela principal escolhe o módulo.
@@ -254,4 +271,17 @@ export async function marcarCorrigido(cadernoId: string, itemId: string, f: Form
     insert into historico (caderno, tela, item, ator, nome, tipo, para, obs)
     values (${t.slug}, ${t.id}, ${itemId}, 'autora', 'Equipe', 'correcao', 'corrigido', ${txt(f, "nota").slice(0, 2000)})`;
   revalidatePath(`/admin/${cadernoId}`);
+}
+
+// ---------- quem valida ----------
+
+// Gera um novo link para continuar (a chave antiga deixa de valer). Para quem perdeu o link ou usou o e-mail de outra pessoa.
+export async function novoLinkDeValidador(cadernoId: string, email: string) {
+  await exigirAdmin();
+  const [c] = await sql`select slug from cadernos where id = ${cadernoId}`;
+  if (!c) redirect(`/admin?erro=caderno`);
+  const chave = novaChave();
+  const feito = await sql`update validadores set token_hash = ${hashDaChave(chave)} where caderno = ${c.slug} and email = ${email} returning email`;
+  if (!feito.length) redirect(`/admin/${cadernoId}/respostas?erro=validador`);
+  redirect(`/admin/${cadernoId}/respostas?novo=${encodeURIComponent(email)}#k=${chave}`);
 }

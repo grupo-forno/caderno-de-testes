@@ -1,6 +1,6 @@
 import Link from "next/link";
 import AdminBar from "@/components/AdminBar";
-import { btn, campo } from "@/components/ui";
+import { btn, campo } from "@/components/estilos";
 import { ehAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
 import { criarCaderno, entrar } from "./actions";
