@@ -14,7 +14,7 @@ export async function buscarCaderno(slug: string): Promise<{ id: string; caderno
       preparadoPor: c.preparado_por,
       rodada: c.rodada,
       antesDeComecar: String(c.antes).split("\n").map((s) => s.trim()).filter(Boolean),
-      telas: telas.map((t) => ({ id: t.id, titulo: t.titulo, imagem: t.imagem_url, link: t.link_url, pdf: t.pdf_url ?? (t.itens.length ? `/api/pdf/${t.id}` : null), itens: t.itens, refazer: t.refazer })),
+      telas: telas.map((t) => ({ id: t.id, titulo: t.titulo, imagem: t.imagem_url, link: t.link_url, pdf: t.pdf_url ?? (t.itens.length ? `/api/pdf/${t.id}` : null), itens: t.itens, refazer: t.refazer, paiId: t.pai_id })),
     },
   };
 }

@@ -41,4 +41,8 @@ alter table respostas drop constraint if exists respostas_pkey;
 alter table respostas add primary key (caderno, email, tela, rodada);
 
 -- true = precisa ser testada na rodada atual. false = já aprovada em rodada anterior
-alter table telas add column if not exists refazer boolean not null default true
+alter table telas add column if not exists refazer boolean not null default true;
+
+
+-- pop-up ou janela: aponta para a tela pai (um nível só)
+alter table telas add column if not exists pai_id uuid references telas(id) on delete cascade

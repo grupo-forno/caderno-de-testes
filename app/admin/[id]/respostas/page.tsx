@@ -20,7 +20,9 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   const [c] = await sql`select slug, titulo, rodada from cadernos where id::text = ${id}`;
   if (!c) notFound();
   const rodada = Math.min(Math.max(Number(rq) || c.rodada, 1), c.rodada);
-  const telas = await sql`select id, titulo from telas where caderno_id = ${id} order by ordem`;
+  const todas = await sql`select id, titulo, pai_id from telas where caderno_id = ${id} order by ordem`;
+  // cada tela principal seguida dos pop-ups dela
+  const telas = todas.filter((t) => !t.pai_id).flatMap((t) => [t, ...todas.filter((f) => f.pai_id === t.id)]);
   const rs = await sql`select nome, email, tela, resultado, obs, anexos, atualizado from respostas where caderno = ${c.slug} and rodada = ${rodada} order by nome, email`;
 
   const pessoas = new Map<string, { nome: string; email: string; porTela: Map<string, (typeof rs)[number]> }>();
@@ -58,7 +60,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                   return (
                     <li key={t.id} className="py-3">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium">{t.titulo}</span>
+                        <span className={t.pai_id ? "ml-5 font-medium" : "font-medium"}>{t.pai_id && "↳ Pop-up: "}{t.titulo}</span>
                         <span className={`rounded px-2 py-0.5 text-xs font-semibold ${COR[res]}`}>{ROTULO[res]}</span>
                       </div>
                       {r?.obs && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{r.obs}</p>}

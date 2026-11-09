@@ -58,14 +58,24 @@ export async function salvarTela(cadernoId: string, telaId: string | null, f: Fo
   if (!titulo) redirect(`/admin/${cadernoId}/tela/${telaId ?? "nova"}?erro=titulo`);
   const nomes = f.getAll("itemNome").map(String);
   const fazs = f.getAll("itemFaz").map(String);
-  const itens = nomes.map((nome, i) => ({ nome: nome.trim(), faz: (fazs[i] ?? "").trim() })).filter((i) => i.nome);
+  const imagens = f.getAll("itemImagem").map(String);
+  const itens = nomes
+    .map((nome, i) => ({ nome: nome.trim(), faz: (fazs[i] ?? "").trim(), ...(imagens[i] ? { imagem: imagens[i] } : {}) }))
+    .filter((i) => i.nome);
+  // Pop-up: a tela pai tem que ser uma tela principal do mesmo caderno, e uma tela que já tem pop-ups não pode virar pop-up
+  const paiId = opc(f, "pai_id");
+  if (paiId) {
+    const [pai] = await sql`select 1 from telas where id::text = ${paiId} and caderno_id = ${cadernoId} and pai_id is null and id::text <> ${telaId ?? ""}`;
+    const [filhos] = telaId ? await sql`select 1 from telas where pai_id = ${telaId} limit 1` : [];
+    if (!pai || filhos) redirect(`/admin/${cadernoId}/tela/${telaId ?? "nova"}?erro=pai`);
+  }
   const dados = { titulo, imagem: opc(f, "imagem_url"), link: opc(f, "link_url"), pdf: opc(f, "pdf_url"), itens: JSON.stringify(itens) };
   if (telaId) {
-    await sql`update telas set titulo = ${dados.titulo}, imagem_url = ${dados.imagem}, link_url = ${dados.link}, pdf_url = ${dados.pdf}, itens = ${dados.itens}::jsonb where id = ${telaId} and caderno_id = ${cadernoId}`;
+    await sql`update telas set titulo = ${dados.titulo}, imagem_url = ${dados.imagem}, link_url = ${dados.link}, pdf_url = ${dados.pdf}, itens = ${dados.itens}::jsonb, pai_id = ${paiId}::uuid where id = ${telaId} and caderno_id = ${cadernoId}`;
   } else {
     await sql`
-      insert into telas (caderno_id, ordem, titulo, imagem_url, link_url, pdf_url, itens)
-      values (${cadernoId}, (select coalesce(max(ordem), 0) + 1 from telas where caderno_id = ${cadernoId}), ${dados.titulo}, ${dados.imagem}, ${dados.link}, ${dados.pdf}, ${dados.itens}::jsonb)`;
+      insert into telas (caderno_id, ordem, titulo, imagem_url, link_url, pdf_url, itens, pai_id)
+      values (${cadernoId}, (select coalesce(max(ordem), 0) + 1 from telas where caderno_id = ${cadernoId}), ${dados.titulo}, ${dados.imagem}, ${dados.link}, ${dados.pdf}, ${dados.itens}::jsonb, ${paiId}::uuid)`;
   }
   await sql`update cadernos set atualizado = now() where id = ${cadernoId}`;
   redirect(`/admin/${cadernoId}?salvo=1`);
@@ -100,7 +110,9 @@ export async function alternarRefazer(cadernoId: string, telaId: string) {
 
 export async function moverTela(cadernoId: string, telaId: string, dir: -1 | 1) {
   await exigirAdmin();
-  const t = await sql`select id, ordem from telas where caderno_id = ${cadernoId} order by ordem`;
+  const [atual] = await sql`select pai_id from telas where id = ${telaId} and caderno_id = ${cadernoId}`;
+  if (!atual) return;
+  const t = await sql`select id, ordem from telas where caderno_id = ${cadernoId} and pai_id is not distinct from ${atual.pai_id}::uuid order by ordem`;
   const i = t.findIndex((x) => x.id === telaId);
   const j = i + dir;
   if (i < 0 || j < 0 || j >= t.length) return;

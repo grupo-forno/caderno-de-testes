@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { upload } from "@vercel/blob/client";
-import type { Caderno as C, Resultado } from "@/lib/tipos";
+import type { Caderno as C, Resultado, Tela } from "@/lib/tipos";
 
 type Resp = { resultado: Resultado; obs: string; anexos: string[] };
 
@@ -94,7 +94,6 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
   const res = (id: string): Resp => (resp[id] ? { ...resp[id], anexos: resp[id].anexos ?? [] } : { resultado: "nao_testado", obs: "", anexos: [] });
   // Telas a testar nesta rodada (no topo) e telas já aprovadas antes (recolhidas, só para consulta)
   const ativas = caderno.telas.filter((t) => t.refazer);
-  const aprovadas = caderno.telas.filter((t) => !t.refazer);
   const total = ativas.length;
   const avaliadas = ativas.filter((t) => res(t.id).resultado !== "nao_testado").length;
   const contagem = (r: Resultado) => ativas.filter((t) => res(t.id).resultado === r).length;
@@ -122,6 +121,137 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
     setEnviando(null);
     if (novos.length) atualizar(id, { anexos: [...res(id).anexos, ...novos].slice(0, 10) });
   }
+
+  // Telas principais e pop-ups. Cada pop-up aparece dentro do cartão da tela pai.
+  const principais = caderno.telas.filter((t) => !t.paiId);
+  const filhosDe = (id: string) => caderno.telas.filter((t) => t.paiId === id);
+  const grupoAtivo = (t: Tela) => t.refazer || filhosDe(t.id).some((f) => f.refazer);
+  const gruposAtivos = principais.filter(grupoAtivo);
+  const aprovadasLinhas = principais.filter((t) => !grupoAtivo(t)).flatMap((t) => [t, ...filhosDe(t.id)]);
+  const ordenadas = principais.flatMap((t) => [t, ...filhosDe(t.id)]); // para o resumo de impressão
+
+  const blocoFilhos = (t: Tela, num: string): ReactNode => {
+    const fs = filhosDe(t.id);
+    if (!fs.length) return null;
+    return (
+      <div className="space-y-3 rounded-md border-l-4 border-indigo-300 bg-indigo-50/50 p-3 sm:p-4">
+        <h3 className="text-sm font-semibold text-indigo-900">Pop-ups e janelas desta tela ({fs.length})</h3>
+        {fs.map((f, j) =>
+          f.refazer ? (
+            cartao(f, `${num}.${j + 1}`, t.titulo)
+          ) : (
+            <div key={f.id} className="flex items-center justify-between gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm">
+              <span><span className="font-medium">{num}.{j + 1}</span> {f.titulo}</span>
+              <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">APROVADO</span>
+            </div>
+          ),
+        )}
+      </div>
+    );
+  };
+
+  const cartao = (t: Tela, num: string, popupDe?: string): ReactNode => {
+    const r = res(t.id);
+    return (
+      <details key={t.id} className={`group rounded-lg border bg-white ${popupDe ? "border-indigo-200" : "border-slate-200"}`}>
+        <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 sm:px-5">
+          <span className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 px-1.5 text-sm font-medium">{num}</span>
+          <span className="flex-1 font-medium">
+            {popupDe && <span className="mr-2 inline-block rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-semibold text-indigo-800">Pop-up de “{popupDe}”</span>}
+            {t.titulo}
+          </span>
+          <span className={`rounded px-2 py-0.5 text-xs font-semibold ${CHIP[r.resultado]}`}>
+            {OPCOES.find((o) => o.v === r.resultado)!.label}
+          </span>
+        </summary>
+
+        <div className="space-y-5 border-t border-slate-100 px-4 py-4 sm:px-5">
+          {t.imagem && <Imagem src={t.imagem} alt={`Imagem ${popupDe ? "do pop-up" : "da tela"} ${t.titulo}`} className="w-full rounded-md border border-slate-200" />}
+
+          <div className="flex flex-wrap gap-2 no-print">
+            {t.link && (
+              <a href={t.link} target="_blank" rel="noreferrer" className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                Abrir a tela para testar
+              </a>
+            )}
+            {t.pdf && (
+              <a href={t.pdf} target="_blank" rel="noreferrer" className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50">
+                Ver PDF das funcionalidades
+              </a>
+            )}
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold">O que cada item faz</h3>
+            <ul className="mt-2 divide-y divide-slate-100 text-sm">
+              {t.itens.map((it, k) => (
+                <li key={k} className="py-2">
+                  <span className="whitespace-pre-wrap font-medium">{it.nome}:</span> <span className="whitespace-pre-wrap text-slate-700">{it.faz}</span>
+                  {it.imagem && <Imagem src={it.imagem} alt={`Imagem do item ${it.nome}`} className="mt-2 max-h-72 rounded-md border border-slate-200" />}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {anterior[t.id] && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+              <p className="font-medium">Na rodada anterior você marcou {OPCOES.find((o) => o.v === anterior[t.id].resultado)?.label}.</p>
+              {anterior[t.id].obs && <p className="mt-1 whitespace-pre-wrap text-slate-700">{anterior[t.id].obs}</p>}
+            </div>
+          )}
+
+          <fieldset>
+            <legend className="text-sm font-semibold">Resultado{popupDe ? " deste pop-up" : ""}</legend>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {OPCOES.map((o) => (
+                <label key={o.v} className={`cursor-pointer rounded-md border px-3 py-2 text-center text-sm font-semibold ${r.resultado === o.v ? ATIVO[o.cor] : "border-slate-300 hover:bg-slate-50"}`}>
+                  <input type="radio" name={`r-${t.id}`} className="sr-only" checked={r.resultado === o.v} onChange={() => atualizar(t.id, { resultado: o.v })} />
+                  {o.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <div>
+            <label htmlFor={`o-${t.id}`} className="text-sm font-semibold">
+              Observações {r.resultado === "nao_ok" && <span className="font-normal text-rose-700">(conte o que precisa mudar)</span>}
+            </label>
+            <textarea
+              id={`o-${t.id}`}
+              rows={3}
+              value={r.obs}
+              onChange={(e) => atualizar(t.id, { obs: e.target.value })}
+              placeholder="Escreva aqui o que achou, dúvidas ou o que precisa mudar."
+              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+            <div className="mt-3 no-print">
+              <label className="inline-block cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50">
+                Anexar print
+                <input type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" onChange={(e) => { if (e.target.files?.length) void anexar(t.id, e.target.files); e.target.value = ""; }} />
+              </label>
+              {enviando === t.id && <span className="ml-2 text-sm text-slate-600">Enviando…</span>}
+              {erroAnexo?.id === t.id && <p role="alert" className="mt-1 text-sm text-rose-700">{erroAnexo.msg}</p>}
+              {r.anexos.length > 0 && (
+                <ul className="mt-3 flex flex-wrap gap-3">
+                  {r.anexos.map((u) => (
+                    <li key={u} className="relative">
+                      <a href={u} target="_blank" rel="noreferrer">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={u} alt="Print anexado" className="h-20 w-28 rounded-md border border-slate-200 object-cover" />
+                      </a>
+                      <button type="button" aria-label="Remover print" onClick={() => atualizar(t.id, { anexos: r.anexos.filter((x) => x !== u) })} className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-xs text-white">×</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          {!popupDe && blocoFilhos(t, num)}
+        </div>
+      </details>
+    );
+  };
 
   if (!pronto) return null;
   if (!pessoa) return <Entrada titulo={caderno.titulo} onEntrar={entrar} />;
@@ -178,114 +308,33 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
 
       <div className="mt-4 space-y-3 print:hidden">
         {ativas.length === 0 && <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Não há telas para testar nesta rodada. Tudo já foi aprovado.</p>}
-        {ativas.map((t, i) => {
-          const r = res(t.id);
+        {gruposAtivos.map((t) => {
+          const num = String(principais.indexOf(t) + 1);
+          if (t.refazer) return cartao(t, num);
+          // tela principal já aprovada, mas com pop-up para refazer: fica só como contexto
           return (
-            <details key={t.id} className="group rounded-lg border border-slate-200 bg-white">
-              <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 sm:px-5">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-medium">{i + 1}</span>
+            <div key={t.id} className="rounded-lg border border-emerald-200 bg-white p-4 sm:p-5">
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 px-1.5 text-sm font-medium">{num}</span>
                 <span className="flex-1 font-medium">{t.titulo}</span>
-                <span className={`rounded px-2 py-0.5 text-xs font-semibold ${CHIP[r.resultado]}`}>
-                  {OPCOES.find((o) => o.v === r.resultado)!.label}
-                </span>
-              </summary>
-
-              <div className="space-y-5 border-t border-slate-100 px-4 py-4 sm:px-5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {t.imagem && <img src={t.imagem} alt={`Imagem da tela ${t.titulo}`} className="w-full rounded-md border border-slate-200" />}
-
-                <div className="flex flex-wrap gap-2 no-print">
-                  {t.link && (
-                    <a href={t.link} target="_blank" rel="noreferrer" className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                      Abrir a tela para testar
-                    </a>
-                  )}
-                  {t.pdf && (
-                    <a href={t.pdf} target="_blank" rel="noreferrer" className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50">
-                      Ver PDF das funcionalidades
-                    </a>
-                  )}
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold">O que cada item faz</h3>
-                  <ul className="mt-2 divide-y divide-slate-100 text-sm">
-                    {t.itens.map((it) => (
-                      <li key={it.nome} className="py-2">
-                        <span className="font-medium">{it.nome}:</span> <span className="whitespace-pre-wrap text-slate-700">{it.faz}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {anterior[t.id] && (
-                  <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                    <p className="font-medium">Na rodada anterior você marcou {OPCOES.find((o) => o.v === anterior[t.id].resultado)?.label}.</p>
-                    {anterior[t.id].obs && <p className="mt-1 whitespace-pre-wrap text-slate-700">{anterior[t.id].obs}</p>}
-                  </div>
-                )}
-
-                <fieldset>
-                  <legend className="text-sm font-semibold">Resultado</legend>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                    {OPCOES.map((o) => (
-                      <label key={o.v} className={`cursor-pointer rounded-md border px-3 py-2 text-center text-sm font-semibold ${r.resultado === o.v ? ATIVO[o.cor] : "border-slate-300 hover:bg-slate-50"}`}>
-                        <input type="radio" name={`r-${t.id}`} className="sr-only" checked={r.resultado === o.v} onChange={() => atualizar(t.id, { resultado: o.v })} />
-                        {o.label}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-
-                <div>
-                  <label htmlFor={`o-${t.id}`} className="text-sm font-semibold">
-                    Observações {r.resultado === "nao_ok" && <span className="font-normal text-rose-700">(conte o que precisa mudar)</span>}
-                  </label>
-                  <textarea
-                    id={`o-${t.id}`}
-                    rows={3}
-                    value={r.obs}
-                    onChange={(e) => atualizar(t.id, { obs: e.target.value })}
-                    placeholder="Escreva aqui o que achou, dúvidas ou o que precisa mudar."
-                    className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                  />
-                  <div className="mt-3 no-print">
-                    <label className="inline-block cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50">
-                      Anexar print
-                      <input type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" onChange={(e) => { if (e.target.files?.length) void anexar(t.id, e.target.files); e.target.value = ""; }} />
-                    </label>
-                    {enviando === t.id && <span className="ml-2 text-sm text-slate-600">Enviando…</span>}
-                    {erroAnexo?.id === t.id && <p role="alert" className="mt-1 text-sm text-rose-700">{erroAnexo.msg}</p>}
-                    {r.anexos.length > 0 && (
-                      <ul className="mt-3 flex flex-wrap gap-3">
-                        {r.anexos.map((u) => (
-                          <li key={u} className="relative">
-                            <a href={u} target="_blank" rel="noreferrer">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={u} alt="Print anexado" className="h-20 w-28 rounded-md border border-slate-200 object-cover" />
-                            </a>
-                            <button type="button" aria-label="Remover print" onClick={() => atualizar(t.id, { anexos: r.anexos.filter((x) => x !== u) })} className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-xs text-white">×</button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
+                <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">APROVADA</span>
               </div>
-            </details>
+              <p className="mt-2 text-sm text-slate-600">Esta tela já foi aprovada. Só os pop-ups abaixo precisam ser refeitos.</p>
+              <div className="mt-3">{blocoFilhos(t, num)}</div>
+            </div>
           );
         })}
       </div>
 
-      {aprovadas.length > 0 && (
+      {aprovadasLinhas.length > 0 && (
         <details className="mt-6 rounded-lg border border-emerald-200 bg-white print:hidden">
           <summary className="cursor-pointer list-none px-4 py-3 font-medium text-emerald-900 sm:px-5">
-            Já aprovadas em rodadas anteriores ({aprovadas.length})
+            Já aprovadas em rodadas anteriores ({aprovadasLinhas.length})
           </summary>
           <ul className="divide-y divide-slate-100 border-t border-slate-100">
-            {aprovadas.map((t) => (
-              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm sm:px-5">
-                <span className="font-medium">{t.titulo}</span>
+            {aprovadasLinhas.map((t) => (
+              <li key={t.id} className={`flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm sm:px-5 ${t.paiId ? "pl-8 sm:pl-10" : ""}`}>
+                <span className="font-medium">{t.paiId && "↳ Pop-up: "}{t.titulo}</span>
                 <span className="flex items-center gap-3">
                   {t.pdf && <a href={t.pdf} target="_blank" rel="noreferrer" className="text-indigo-700 underline">PDF</a>}
                   {t.link && <a href={t.link} target="_blank" rel="noreferrer" className="text-indigo-700 underline">Abrir tela</a>}
@@ -322,9 +371,9 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
             <table className="mt-4 hidden w-full border-collapse text-sm print:table">
               <thead><tr className="border-b border-slate-400 text-left"><th className="py-1 pr-3">Tela</th><th className="py-1 pr-3">Resultado</th><th className="py-1">Observações</th></tr></thead>
               <tbody>
-                {caderno.telas.map((t) => (
+                {ordenadas.map((t) => (
                   <tr key={t.id} className="border-b border-slate-200 align-top">
-                    <td className="py-1 pr-3 font-medium">{t.titulo}</td>
+                    <td className="py-1 pr-3 font-medium">{t.paiId && "↳ Pop-up: "}{t.titulo}</td>
                     <td className="py-1 pr-3 whitespace-nowrap">{t.refazer ? OPCOES.find((o) => o.v === res(t.id).resultado)!.label : "APROVADA ANTES"}</td>
                     <td className="py-1 whitespace-pre-wrap">{res(t.id).obs}{res(t.id).anexos.length > 0 && ` (${res(t.id).anexos.length} print${res(t.id).anexos.length > 1 ? "s" : ""} anexado${res(t.id).anexos.length > 1 ? "s" : ""})`}</td>
                   </tr>
@@ -374,5 +423,21 @@ function Entrada({ titulo, onEntrar }: { titulo: string; onEntrar: (p: Pessoa) =
         <button className="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Começar</button>
       </form>
     </main>
+  );
+}
+
+function Imagem({ src, alt, className }: { src: string; alt: string; className: string }) {
+  const janela = useRef<HTMLDialogElement>(null);
+  return (
+    <>
+      <button type="button" onClick={() => janela.current?.showModal()} aria-label="Ampliar imagem" className="block cursor-zoom-in text-left">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={alt} className={className} />
+      </button>
+      <dialog ref={janela} onClick={() => janela.current?.close()} className="m-auto max-h-[92vh] max-w-[92vw] rounded-lg p-2 backdrop:bg-black/70">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={alt} className="max-h-[88vh] max-w-full cursor-zoom-out" />
+      </dialog>
+    </>
   );
 }

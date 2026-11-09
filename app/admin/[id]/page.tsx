@@ -16,8 +16,14 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   const { erro, salvo } = await searchParams;
   const [c] = await sql`select * from cadernos where id::text = ${id}`;
   if (!c) notFound();
-  const telas = await sql`select id, titulo, imagem_url, link_url, pdf_url, refazer, jsonb_array_length(itens)::int as n from telas where caderno_id = ${id} order by ordem`;
+  const telas = await sql`select id, titulo, pai_id, imagem_url, link_url, pdf_url, refazer, jsonb_array_length(itens)::int as n from telas where caderno_id = ${id} order by ordem`;
   const sit = await situacao(c.slug, c.rodada);
+  // Lista em árvore: cada tela principal seguida dos pop-ups dela
+  const principais = telas.filter((x) => !x.pai_id);
+  const linhas = principais.flatMap((pai, i) => [
+    { t: pai, num: String(i + 1), nivel: 0, pos: i, total: principais.length, filhos: telas.filter((f) => f.pai_id === pai.id).length, paiTitulo: "" },
+    ...telas.filter((f) => f.pai_id === pai.id).map((f, j, arr) => ({ t: f, num: `${i + 1}.${j + 1}`, nivel: 1, pos: j, total: arr.length, filhos: 0, paiTitulo: pai.titulo as string })),
+  ]);
   const tudoAprovado = telas.length > 0 && telas.every((x) => sit[x.id]?.aprovada);
   const h = await headers();
   const url = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}/c/${c.slug}`;
@@ -67,11 +73,14 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             <p className="mt-3 text-sm text-slate-600">Nenhuma tela ainda. Clique em “Adicionar tela” para começar.</p>
           ) : (
             <ul className="mt-3 divide-y divide-slate-100">
-              {telas.map((t, i) => (
-                <li key={t.id} className="flex flex-wrap items-center gap-3 py-3">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-sm font-medium">{i + 1}</span>
+              {linhas.map(({ t, num, nivel, pos, total, filhos, paiTitulo }) => (
+                <li key={t.id} className={`flex flex-wrap items-center gap-3 py-3 ${nivel ? "ml-6 border-l-2 border-indigo-200 pl-4 sm:ml-10" : ""}`}>
+                  <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-100 px-1.5 text-sm font-medium">{num}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium">{t.titulo}</p>
+                    <p className="font-medium">
+                      {nivel > 0 && <span className="mr-2 rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-semibold text-indigo-800">Pop-up de “{paiTitulo}”</span>}
+                      {t.titulo}
+                    </p>
                     <p className="text-xs text-slate-500">
                       {t.imagem_url ? "Imagem ✓" : "Sem imagem"} · {t.pdf_url ? "PDF ✓" : t.n > 0 ? "PDF gerado pela lista" : "Sem PDF"} · {t.link_url ? "Link ✓" : "Sem link"} · {t.n} {t.n === 1 ? "item" : "itens"}
                     </p>
@@ -82,15 +91,16 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                       </span>
                     </p>
                   </div>
-                  <form action={moverTela.bind(null, id, t.id, -1)}><button disabled={i === 0} aria-label="Subir" className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-30">↑</button></form>
-                  <form action={moverTela.bind(null, id, t.id, 1)}><button disabled={i === telas.length - 1} aria-label="Descer" className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-30">↓</button></form>
+                  <form action={moverTela.bind(null, id, t.id, -1)}><button disabled={pos === 0} aria-label="Subir" className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-30">↑</button></form>
+                  <form action={moverTela.bind(null, id, t.id, 1)}><button disabled={pos === total - 1} aria-label="Descer" className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-30">↓</button></form>
                   {c.rodada > 1 && (
                     <form action={alternarRefazer.bind(null, id, t.id)}>
                       <button className="text-sm text-slate-600 underline">{t.refazer ? "Marcar como aprovada" : "Voltar para teste"}</button>
                     </form>
                   )}
+                  {nivel === 0 && <Link href={`/admin/${id}/tela/nova?pai=${t.id}`} className="text-sm text-indigo-700 underline">Adicionar pop-up</Link>}
                   <Link href={`/admin/${id}/tela/${t.id}`} className={btn2}>Editar</Link>
-                  <form action={excluirTela.bind(null, id, t.id)}><Confirmar texto={`Excluir a tela “${t.titulo}”? Não dá para desfazer.`}>Excluir</Confirmar></form>
+                  <form action={excluirTela.bind(null, id, t.id)}><Confirmar texto={`Excluir ${nivel ? "o pop-up" : "a tela"} “${t.titulo}”${filhos ? ` e os ${filhos} pop-ups dela` : ""}? Não dá para desfazer.`}>Excluir</Confirmar></form>
                 </li>
               ))}
             </ul>
