@@ -212,7 +212,7 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
                   <ul className="mt-2 divide-y divide-slate-100 text-sm">
                     {t.itens.map((it) => (
                       <li key={it.nome} className="py-2">
-                        <span className="font-medium">{it.nome}:</span> <span className="text-slate-700">{it.faz}</span>
+                        <span className="font-medium">{it.nome}:</span> <span className="whitespace-pre-wrap text-slate-700">{it.faz}</span>
                       </li>
                     ))}
                   </ul>

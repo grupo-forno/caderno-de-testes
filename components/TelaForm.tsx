@@ -120,10 +120,16 @@ export default function TelaForm({ acao, inicial, erro }: { acao: (f: FormData) 
         </p>
         <div className="mt-3 space-y-3">
           {itens.map((it, i) => (
-            <div key={i} className="grid gap-2 rounded-md border border-slate-200 bg-white p-3 sm:grid-cols-[1fr_2fr_auto]">
-              <input name="itemNome" value={it.nome} onChange={(e) => mudar(i, { nome: e.target.value })} placeholder="Ex.: Botão Salvar" aria-label="Nome do item" className={campo + " mt-0"} />
-              <input name="itemFaz" value={it.faz} onChange={(e) => mudar(i, { faz: e.target.value })} placeholder="Ex.: Grava o cadastro e volta para a lista" aria-label="O que faz" className={campo + " mt-0"} />
-              <button type="button" onClick={() => setItens(itens.filter((_, j) => j !== i))} className="text-sm text-slate-600 underline">Remover</button>
+            <div key={i} className="grid gap-3 rounded-md border border-slate-200 bg-white p-3 sm:grid-cols-[1fr_2fr_auto]">
+              <label className="block text-xs font-medium text-slate-600">
+                Item (botão, campo, área…)
+                <textarea name="itemNome" rows={2} value={it.nome} onChange={(e) => mudar(i, { nome: e.target.value })} placeholder="Ex.: Botão Salvar, Campo Nome, Área de filtros" className={campo + " field-sizing-content min-h-14 resize-y text-slate-900"} />
+              </label>
+              <label className="block text-xs font-medium text-slate-600">
+                O que faz
+                <textarea name="itemFaz" rows={2} value={it.faz} onChange={(e) => mudar(i, { faz: e.target.value })} placeholder="Ex.: Grava o cadastro e volta para a lista" className={campo + " field-sizing-content min-h-14 resize-y text-slate-900"} />
+              </label>
+              <button type="button" onClick={() => setItens(itens.filter((_, j) => j !== i))} className="self-start text-sm text-slate-600 underline sm:mt-5">Remover</button>
             </div>
           ))}
         </div>
