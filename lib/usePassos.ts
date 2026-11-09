@@ -8,7 +8,8 @@ const TEMPO = 15000;
 const TRANSITORIOS = [408, 425, 429];
 const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export type Credencial = { caderno: string; chave: string };
+// api: endereço para gravar cada passo. Padrão é o do caderno (/api/passos). As rodadas usam /api/rodada/resposta.
+export type Credencial = { caderno: string; chave: string; api?: string };
 
 // Respostas aos passos do roteiro: guarda na tela, salva sozinho (com nova tentativa se a rede falhar) e nunca descarta o que a pessoa escreveu.
 // Toda chamada leva a chave de quem valida; o e-mail não vale como prova.
@@ -74,7 +75,7 @@ export function usePassos(cred: Credencial | null) {
       let msg: string | undefined;
       let codigo: string | undefined;
       try {
-        const x = await fetch("/api/passos", {
+        const x = await fetch(c.api ?? "/api/passos", {
           method: "PUT",
           headers: cabecalhos(c),
           body: JSON.stringify({ caderno: c.caderno, item: itemDe.current[passo], passo, ...valor }),
@@ -100,11 +101,11 @@ export function usePassos(cred: Credencial | null) {
         setSalvo(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
         break;
       }
-      if (status === 409 && codigo === "aceito") {
+      if (status === 409 && (codigo === "aceito" || codigo === "enviado")) {
         sujos.current.clear();
         falhou.current.clear();
         setConcluido(msg ?? "A homologação foi concluída. O caderno está só para leitura.");
-        void carregar();
+        if (!c.api) void carregar();
         break;
       }
       if (status >= 400 && status < 500 && !TRANSITORIOS.includes(status)) {
@@ -155,7 +156,7 @@ export function usePassos(cred: Credencial | null) {
       for (const p of sujos.current) {
         if (voando.current.has(p) || !respRef.current[p]) continue;
         try {
-          void fetch("/api/passos", { method: "PUT", headers: cabecalhos(c), body: JSON.stringify({ caderno: c.caderno, item: itemDe.current[p], passo: p, ...respRef.current[p] }), keepalive: true });
+          void fetch(c.api ?? "/api/passos", { method: "PUT", headers: cabecalhos(c), body: JSON.stringify({ caderno: c.caderno, item: itemDe.current[p], passo: p, ...respRef.current[p] }), keepalive: true });
         } catch {}
       }
     }
@@ -190,7 +191,15 @@ export function usePassos(cred: Credencial | null) {
     contar();
   }
 
+  // Coloca respostas já carregadas (as rodadas buscam tudo de uma vez em /api/rodada)
+  // (useCallback: quem usa isto num efeito não pode ver uma função nova a cada renderização)
+  const definir = useCallback((r: Record<string, RespPasso>, concluido: string | null = null) => {
+    respRef.current = r;
+    setResp(r);
+    setConcluido(concluido);
+  }, []);
+
   const semSalvar = () => sujos.current.size;
 
-  return { resp, salvo, ocupado, falhas, bloqueio, concluido, carregar, mudar, tentarDeNovo, limpar, semSalvar };
+  return { resp, salvo, ocupado, falhas, bloqueio, concluido, carregar, definir, mudar, tentarDeNovo, limpar, semSalvar };
 }

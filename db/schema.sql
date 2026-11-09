@@ -254,3 +254,89 @@ create table if not exists cenarios (
 ;
 
 create index if not exists cenarios_caderno on cenarios (caderno_id, situacao)
+
+;
+
+-- MÓDULO 3: RODADAS DE HOMOLOGAÇÃO. Uma rodada é uma entrega (versão) com cenários escolhidos na biblioteca e atribuídos a validadores. Começa como rascunho e, ao publicar, guarda uma cópia (snapshot) dos cenários que não muda mais
+create table if not exists rodadas (
+  id             uuid primary key default gen_random_uuid(),
+  caderno_id     uuid not null references cadernos(id) on delete cascade,
+  nome           text not null,
+  versao         text not null default '1.0',
+  ambiente_url   text,
+  prazo          date,
+  resumo         text not null default '',
+  instrucoes     text not null default '',
+  fora_escopo    text not null default '',
+  situacao       text not null default 'rascunho' check (situacao in ('rascunho', 'em_validacao')),
+  origem_rodada  uuid references rodadas(id) on delete set null,
+  publicada_em   timestamptz,
+  criado         timestamptz not null default now(),
+  atualizado     timestamptz not null default now()
+)
+;
+
+-- cenário escolhido para a rodada. Ao publicar, o campo snapshot recebe a cópia do cenário com ordem, ações, resultados esperados, perfis e telas
+create table if not exists rodada_cenarios (
+  id          uuid primary key default gen_random_uuid(),
+  rodada_id   uuid not null references rodadas(id) on delete cascade,
+  cenario_id  uuid references cenarios(id) on delete set null,
+  ordem       int not null,
+  snapshot    jsonb,
+  unique (rodada_id, cenario_id)
+)
+;
+
+-- validador: a pessoa que executa. O perfil de acesso (conta ou função no sistema em teste) fica em cada passo do cenário
+create table if not exists rodada_validadores (
+  id           uuid primary key default gen_random_uuid(),
+  rodada_id    uuid not null references rodadas(id) on delete cascade,
+  nome         text not null,
+  email        text not null,
+  nota         text not null default '',
+  chave_versao int not null default 1,
+  unique (rodada_id, email)
+)
+;
+
+-- atribuição: um cenário da rodada para um validador. Cada uma tem seu progresso e suas respostas
+create table if not exists rodada_atribuicoes (
+  id                 uuid primary key default gen_random_uuid(),
+  rodada_cenario_id  uuid not null references rodada_cenarios(id) on delete cascade,
+  validador_id       uuid not null references rodada_validadores(id) on delete cascade,
+  enviado_em         timestamptz,
+  unique (rodada_cenario_id, validador_id)
+)
+;
+
+create table if not exists respostas_atribuicao (
+  atribuicao_id uuid not null references rodada_atribuicoes(id) on delete cascade,
+  passo         text not null,
+  resultado     text not null check (resultado in ('funcionou', 'diferente', 'nao_consegui')),
+  obs           text not null default '',
+  anexos        jsonb not null default '[]',
+  atualizado    timestamptz not null default now(),
+  primary key (atribuicao_id, passo)
+)
+;
+
+-- registro de acréscimo: cada mudança de resultado e cada envio ficam guardados
+create table if not exists rodada_eventos (
+  id            bigserial primary key,
+  atribuicao_id uuid not null references rodada_atribuicoes(id) on delete cascade,
+  passo         text,
+  tipo          text not null check (tipo in ('resultado', 'envio')),
+  de            text,
+  para          text,
+  obs           text not null default '',
+  criado        timestamptz not null default now()
+)
+;
+
+create index if not exists rodadas_caderno on rodadas (caderno_id)
+;
+
+create index if not exists rodada_cenarios_rodada on rodada_cenarios (rodada_id)
+;
+
+create index if not exists rodada_atribuicoes_validador on rodada_atribuicoes (validador_id)

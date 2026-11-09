@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // permite um segundo servidor de teste (NEXT_DIST_DIR=.next-teste npm run dev -- -p 3100) sem brigar com o .next do primeiro
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // abrir o caderno pelo IP da rede local (celular ou outro computador) no modo dev; sem isto o Next bloqueia os scripts e os botões não funcionam
   allowedDevOrigins: ["192.168.100.18"],
   /* config options here */

@@ -21,6 +21,8 @@ export type PassoFila = {
   numeroTela: string;
   modulo: Modulo;
   numeroModulo: string;
+  perfil?: string; // perfil de acesso que executa este passo (cenários de rodada)
+  perfilAnterior?: string | null; // perfil do passo anterior, para avisar a troca
 };
 
 export const idPasso = (id: string) => `p:${id}`;
@@ -77,13 +79,16 @@ type Props = {
   chave: string;
   slug: string;
   somenteLeitura: boolean;
+  payloadUpload?: string; // texto enviado ao /api/upload para provar quem está anexando (padrão: caderno e chave)
+  rotuloItem?: string; // como chamar a unidade do teste: "Funcionalidade" (padrão) ou "Cenário"
+  semLinkTela?: boolean; // dentro de uma rodada a tela não é uma página navegável
   salvamento: { texto: string; tipo: "ok" | "salvando" | "erro" };
   aoMudar: (itemId: string, passoId: string, patch: Partial<RespPasso>) => void;
   aoIr: (id: string) => void;
   aoSair: () => void;
 };
 
-export default function Execucao({ atual, fila, posicao, resp, chave, slug, somenteLeitura, salvamento, aoMudar, aoIr, aoSair }: Props) {
+export default function Execucao({ atual, fila, posicao, resp, chave, slug, somenteLeitura, payloadUpload, rotuloItem = "Funcionalidade", semLinkTela, salvamento, aoMudar, aoIr, aoSair }: Props) {
   const { passo, item, tela, modulo } = atual;
   const r = resp[passo.id];
   const estado = estadoPasso(r);
@@ -122,7 +127,7 @@ export default function Execucao({ atual, fila, posicao, resp, chave, slug, some
         continue;
       }
       try {
-        const b = await upload(f.name, f, { access: "public", handleUploadUrl: "/api/upload", clientPayload: JSON.stringify({ caderno: slug, chave }) });
+        const b = await upload(f.name, f, { access: "public", handleUploadUrl: "/api/upload", clientPayload: payloadUpload ?? JSON.stringify({ caderno: slug, chave }) });
         novos.push(b.url);
       } catch {
         avisos.push(`Não conseguimos enviar “${f.name}”. Confira sua internet e tente de novo. Se continuar, avise quem preparou o caderno.`);
@@ -169,16 +174,18 @@ export default function Execucao({ atual, fila, posicao, resp, chave, slug, some
           <li>Módulo {atual.numeroModulo} · {modulo.titulo}</li>
           <li aria-hidden="true">›</li>
           <li>
-            <LinkTela id={tela.id} aoIr={aoIr} className={`rounded underline ${FOCO}`}>
-              Tela {atual.numeroTela} · {tela.titulo}
-            </LinkTela>
+            {semLinkTela ? <span>Tela · {tela.titulo}</span> : (
+              <LinkTela id={tela.id} aoIr={aoIr} className={`rounded underline ${FOCO}`}>
+                Tela {atual.numeroTela} · {tela.titulo}
+              </LinkTela>
+            )}
           </li>
         </ol>
       </nav>
 
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
         <h2 id="titulo-tela" tabIndex={-1} className="min-w-0 flex-1 break-words text-balance text-2xl font-semibold focus:outline-none">
-          <span className="block text-sm font-medium text-slate-700">Funcionalidade</span>
+          <span className="block text-sm font-medium text-slate-700">{rotuloItem}</span>
           <span className="whitespace-pre-wrap">{item.nome}</span>
         </h2>
         <div className="text-right">
@@ -234,6 +241,13 @@ export default function Execucao({ atual, fila, posicao, resp, chave, slug, some
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* instrução e resultado esperado, com a imagem por perto */}
         <div className="space-y-4">
+          {atual.perfil && (
+            <section aria-label="Perfil de acesso" className="rounded-lg border border-violet-300 bg-violet-50 p-3 text-sm text-violet-950">
+              <p><strong>Perfil de acesso para este passo:</strong> {atual.perfil}</p>
+              {atual.perfilAnterior && atual.perfilAnterior !== atual.perfil && <p className="mt-1 font-semibold">Troque de perfil: no passo anterior era {atual.perfilAnterior}. Entre no sistema de teste com a conta ou função {atual.perfil}.</p>}
+              <p className="mt-1 text-xs">Perfil é a conta ou função usada no sistema em teste. Se não tiver a conta, avise quem preparou a rodada. Nunca escreva senhas aqui.</p>
+            </section>
+          )}
           <section aria-labelledby="t-fazer" className="rounded-lg border border-slate-300 bg-white p-4">
             <h3 id="t-fazer" className="text-sm font-semibold uppercase tracking-wide text-indigo-900">O que fazer</h3>
             <p className="mt-2 whitespace-pre-wrap text-base">{passo.fazer}</p>
@@ -350,7 +364,7 @@ export default function Execucao({ atual, fila, posicao, resp, chave, slug, some
         <button type="button" onClick={aoSair} className={`min-h-11 rounded-md px-3 text-sm font-medium text-indigo-800 underline ${FOCO}`}>Sair do teste (o que você fez fica salvo)</button>
         {proximo ? (
           <LinkTela id={idPasso(proximo.passo.id)} aoIr={aoIr} className={`inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>
-            {proximo.item.id === item.id ? "Próximo passo" : "Próxima funcionalidade"}<span aria-hidden="true"> →</span>
+            {proximo.item.id === item.id ? "Próximo passo" : `Próximo ${rotuloItem.toLowerCase()}`}<span aria-hidden="true"> →</span>
           </LinkTela>
         ) : (
           <button type="button" onClick={aoSair} className={`min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>Terminar e ver o resumo</button>

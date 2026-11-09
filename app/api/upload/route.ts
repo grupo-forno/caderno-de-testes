@@ -1,6 +1,7 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { ehAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
+import { validadorDoConvite } from "@/lib/convite";
 import { validadorDaChave } from "@/lib/validador";
 
 const IMAGENS = ["image/png", "image/jpeg", "image/webp"];
@@ -8,14 +9,14 @@ const IMAGENS = ["image/png", "image/jpeg", "image/webp"];
 // Erro de validação: o pedido está errado e repetir não adianta (responde 400 com texto fixo)
 class Recusa extends Error {}
 
-function lerPayload(p: string | null): { caderno: string; chave: string | null } {
+function lerPayload(p: string | null): { caderno: string; chave: string | null; convite: string | null } {
   if (p?.startsWith("{")) {
     try {
       const j = JSON.parse(p);
-      return { caderno: typeof j.caderno === "string" ? j.caderno : "", chave: typeof j.chave === "string" && j.chave ? j.chave : null };
+      return { caderno: typeof j.caderno === "string" ? j.caderno : "", chave: typeof j.chave === "string" && j.chave ? j.chave : null, convite: typeof j.convite === "string" && j.convite ? j.convite : null };
     } catch {}
   }
-  return { caderno: p ?? "", chave: null };
+  return { caderno: p ?? "", chave: null, convite: null };
 }
 
 // Autora: imagens (até 10 MB) e PDFs (até 20 MB).
@@ -32,7 +33,10 @@ export async function POST(req: Request) {
         // Prints dos passos: o payload traz a chave de quem valida, conferida no servidor.
         // Payload só com o endereço do caderno é o modelo antigo (funcionalidades sem roteiro).
         const pedido = lerPayload(payload);
-        if (pedido.chave) {
+        if (pedido.convite) {
+          // prints de uma rodada: o convite do validador é conferido no servidor
+          if (!(await validadorDoConvite(pedido.convite))) throw new Recusa("chave");
+        } else if (pedido.chave) {
           if (!(await validadorDaChave(pedido.chave, pedido.caderno))) throw new Recusa("chave");
         } else {
           const [c] = pedido.caderno ? await sql`select 1 from cadernos where slug = ${pedido.caderno}` : [];

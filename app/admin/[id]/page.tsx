@@ -103,6 +103,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             <Link href={`/admin/${id}/respostas`} className={btn2 + " inline-flex min-h-11 items-center"}>Ver respostas</Link>
             <Link href={`/admin/${id}/historico`} className={btn2 + " inline-flex min-h-11 items-center"}>Ver histórico</Link>
             <Link href={`/admin/${id}/biblioteca`} className={btn2 + " inline-flex min-h-11 items-center"}>Biblioteca de testes</Link>
+            <Link href={`/admin/${id}/rodadas`} className={btn2 + " inline-flex min-h-11 items-center"}>Rodadas</Link>
           </div>
           <FerramentasPlanilha cadernoId={id} />
         </section>
