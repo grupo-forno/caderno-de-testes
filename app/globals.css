@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  details > * { display: block; }
+}
