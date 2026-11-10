@@ -96,9 +96,15 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
     const it = itensPorId.get(id);
     if (it && temRoteiro(it)) {
       const rp = (pid: string) => ps.resp[pid];
-      return { resultado: resultadoDoItem(it.passos, rp), obs: observacaoDoItem(it.passos, rp), anexos: anexosDoItem(it.passos, rp), severidade: null };
+      return { resultado: resultadoDoItem(it.passos, rp), obs: observacaoDoItem(it.passos, rp), anexos: anexosDoItem(it.passos, rp), severidade: ps.gravidade[id] ?? null };
     }
     return resp[id] ? { ...VAZIA, ...resp[id], anexos: resp[id].anexos ?? [] } : VAZIA;
+  };
+  // Para onde o resumo leva quem precisa informar a gravidade: o passo que falhou (roteiro) ou a tela da funcionalidade (modelo antigo)
+  const destinoGravidade = (itemId: string, telaId: string) => {
+    const it = itensPorId.get(itemId);
+    const falha = it && temRoteiro(it) ? it.passos.find((p) => ps.resp[p.id]?.resultado === "diferente") : undefined;
+    return falha ? idPasso(falha.id) : telaId;
   };
   // todos os passos, na ordem do menu (módulo > tela > funcionalidade > passo)
   const fila: PassoFila[] = [];
@@ -788,8 +794,11 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
                 somenteLeitura={somenteLeitura}
                 salvamento={textoSalvamento}
                 aoMudar={ps.mudar}
+                gravidade={ps.gravidade}
+                aoGravidade={ps.informarGravidade}
+                erroGravidade={ps.erroGravidade}
                 aoIr={ir}
-                aoSair={() => ir("inicio")}
+                aoSair={() => ir(posPasso === fila.length - 1 ? "resumo" : "inicio")} // no último passo o botão é "Terminar e ver o resumo"
               />
             ) : atual ? (
               <TelaView
@@ -823,7 +832,7 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
                 aoIr={ir}
               />
             ) : (
-              <Resumo modulos={modulosResumo} resumos={resumos} geral={geral} res={res} aoIr={ir} pendentes={ocupadoT} falhas={falhasT} bloqueado={!!bloqueioT} pessoa={pessoa} aceite={aceite} aoConcluir={concluir} />
+              <Resumo destinoGravidade={destinoGravidade} modulos={modulosResumo} resumos={resumos} geral={geral} res={res} aoIr={ir} pendentes={ocupadoT} falhas={falhasT} bloqueado={!!bloqueioT} pessoa={pessoa} aceite={aceite} aoConcluir={concluir} />
             )}
           </div>
         </main>

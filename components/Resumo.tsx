@@ -16,6 +16,7 @@ type Props = {
   geral: ResumoTela;
   res: (id: string) => Resp;
   aoIr: (id: string) => void;
+  destinoGravidade: (itemId: string, telaId: string) => string; // onde se informa a gravidade de uma falha
   pendentes: number; // respostas ainda sendo salvas
   falhas: number; // respostas que não conseguiram salvar
   bloqueado: boolean; // o servidor recusou uma gravação e a página precisa ser recarregada
@@ -24,7 +25,7 @@ type Props = {
   aoConcluir: () => Promise<string | null>; // devolve a mensagem de erro, ou null se deu certo
 };
 
-export default function Resumo({ modulos, resumos, geral, res, aoIr, pendentes, falhas, bloqueado, pessoa, aceite, aoConcluir }: Props) {
+export default function Resumo({ destinoGravidade, modulos, resumos, geral, res, aoIr, pendentes, falhas, bloqueado, pessoa, aceite, aoConcluir }: Props) {
   // mesma conta que o servidor faz na hora de concluir (o servidor é quem decide de verdade)
   const contagem: ContagemAceite = { total: 0, ok: 0, naoOk: 0, naoTestado: 0, emPreparacao: 0, impedem: 0 };
   for (const m of modulos) {
@@ -44,11 +45,11 @@ export default function Resumo({ modulos, resumos, geral, res, aoIr, pendentes, 
       }
     }
   }
-  const atencao: { telaId: string; tela: string; item: string; obs: string; gravidade: string | null }[] = [];
+  const atencao: { itemId: string; telaId: string; tela: string; item: string; obs: string; gravidade: string | null }[] = [];
   for (const m of modulos) {
     for (const { tela } of m.telas) {
       for (const i of tela.itens) {
-        if (res(i.id).resultado === "nao_ok") { const sv = res(i.id).severidade; atencao.push({ telaId: tela.id, tela: tela.titulo, item: i.nome, obs: res(i.id).obs, gravidade: sv ? ROTULO_SEVERIDADE[sv] : null }); }
+        if (res(i.id).resultado === "nao_ok") { const sv = res(i.id).severidade; atencao.push({ itemId: i.id, telaId: tela.id, tela: tela.titulo, item: i.nome, obs: res(i.id).obs, gravidade: sv ? ROTULO_SEVERIDADE[sv] : null }); }
       }
     }
   }
@@ -131,7 +132,13 @@ export default function Resumo({ modulos, resumos, geral, res, aoIr, pendentes, 
             {atencao.map((a, k) => (
               <li key={k} className="rounded-lg border border-rose-200 bg-white p-3 text-sm">
                 <p className="whitespace-pre-wrap font-medium">{a.item}</p>
-                <p className="text-xs text-slate-700">na tela “{a.tela}”{a.gravidade && ` · ${a.gravidade}`}</p>
+                <p className="text-xs text-slate-700">na tela “{a.tela}”{a.gravidade && ` · Gravidade: ${a.gravidade}`}</p>
+                {!a.gravidade && (
+                  <p className="mt-1 text-rose-800">
+                    Falta informar a gravidade: sem ela, conta como “Impede de usar” e a homologação não pode ser concluída.{" "}
+                    <LinkTela id={destinoGravidade(a.itemId, a.telaId)} aoIr={aoIr} ariaLabel={`Informar a gravidade da falha em “${a.item}”`} className={`rounded font-medium underline ${FOCO}`}>Informar gravidade</LinkTela>
+                  </p>
+                )}
                 {a.obs.trim() ? (
                   <p className="mt-1 whitespace-pre-wrap text-slate-800">{a.obs}</p>
                 ) : (

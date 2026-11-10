@@ -19,10 +19,12 @@ export async function GET(req: NextRequest) {
   if (!v) return erro(SEM_PERMISSAO, 401, "sem_permissao");
   try {
     const rows = await sql`select passo, resultado, obs, anexos from respostas_passo where caderno = ${caderno} and email = ${v.email}`;
+    const graves = await sql`select item, severidade from respostas_item where caderno = ${caderno} and email = ${v.email} and resultado = 'nao_ok' and severidade is not null`;
     const aceite = await aceiteVigente(caderno);
     return Response.json(
       {
         passos: Object.fromEntries(rows.map((x) => [x.passo, { resultado: x.resultado, obs: x.obs, anexos: x.anexos }])),
+        gravidades: Object.fromEntries(graves.map((x) => [x.item, x.severidade])),
         aceite: aceite ? { nome: aceite.nome, criado: aceite.criado } : null,
       },
       { headers: { "Cache-Control": "no-store" } },
@@ -120,8 +122,8 @@ export async function PUT(req: NextRequest) {
         select ${caderno}, ${v.email}, ${v.nome}, ${t.id}, ${itemId}, ${derivado}, ${obsItem}, ${anexosItem}::jsonb, null
         where not exists (select 1 from aceites a where a.caderno = ${caderno} and a.reaberto_em is null)
         on conflict (caderno, email, item)
-        do update set nome = excluded.nome, tela = excluded.tela, resultado = excluded.resultado, obs = excluded.obs, anexos = excluded.anexos, severidade = null, atualizado = now()
-        returning item`,
+        do update set nome = excluded.nome, tela = excluded.tela, resultado = excluded.resultado, obs = excluded.obs, anexos = excluded.anexos, severidade = case when excluded.resultado = 'nao_ok' then respostas_item.severidade else null end, atualizado = now()
+        returning item, severidade`,
     ]);
 
     // o aceite foi concluído entre a conferência e a gravação: nada foi gravado
@@ -129,7 +131,9 @@ export async function PUT(req: NextRequest) {
       const agora = await aceiteVigente(caderno);
       if (agora) return aceito(agora);
     }
-    return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+    // devolve a gravidade que vale agora para a funcionalidade, para a tela não ficar com um valor velho
+    const gravidade = ((r[4] as { severidade: string | null }[])[0]?.severidade ?? null);
+    return Response.json({ ok: true, gravidade }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     console.error("PUT /api/passos", e);
     return erro("Não conseguimos salvar agora. Sua resposta continua na tela; tente de novo em instantes.", 500);

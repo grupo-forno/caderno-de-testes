@@ -29,7 +29,7 @@ export function criterios(c: ContagemAceite): Criterio[] {
       texto:
         c.impedem === 0
           ? "Nenhuma funcionalidade NÃO OK que impeça o uso"
-          : `${c.impedem} ${c.impedem === 1 ? "funcionalidade NÃO OK impede" : "funcionalidades NÃO OK impedem"} o uso ou está sem gravidade. Peça a correção ou informe a gravidade`,
+          : `${c.impedem} ${c.impedem === 1 ? "funcionalidade NÃO OK impede" : "funcionalidades NÃO OK impedem"} o uso ou está sem gravidade. Use “Informar gravidade” na lista “O que você marcou como NÃO OK”, ou peça a correção`,
       ok: c.impedem === 0,
     },
   ];

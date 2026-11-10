@@ -5,7 +5,7 @@ import { upload } from "@vercel/blob/client";
 import Imagem from "@/components/Imagem";
 import LinkTela from "@/components/LinkTela";
 import { estadoPasso, passoCompleto, ROTULO_PASSO, RESULTADOS_PASSO, type EstadoPasso } from "@/lib/passos";
-import type { Item, Modulo, Passo, RespPasso, ResultadoPasso, Tela } from "@/lib/tipos";
+import { ROTULO_SEVERIDADE, SEVERIDADES, type Item, type Modulo, type Passo, type RespPasso, type ResultadoPasso, type Severidade, type Tela } from "@/lib/tipos";
 
 const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
 const MAX_PRINTS = 10;
@@ -86,9 +86,12 @@ type Props = {
   aoMudar: (itemId: string, passoId: string, patch: Partial<RespPasso>) => void;
   aoIr: (id: string) => void;
   aoSair: () => void;
+  gravidade?: Record<string, Severidade>; // gravidade da falha de cada funcionalidade (só no caderno; as rodadas não usam)
+  aoGravidade?: (itemId: string, sev: Severidade) => void;
+  erroGravidade?: string | null;
 };
 
-export default function Execucao({ atual, fila, posicao, resp, chave, slug, somenteLeitura, payloadUpload, rotuloItem = "Funcionalidade", semLinkTela, salvamento, aoMudar, aoIr, aoSair }: Props) {
+export default function Execucao({ atual, fila, posicao, resp, chave, slug, somenteLeitura, payloadUpload, rotuloItem = "Funcionalidade", semLinkTela, salvamento, aoMudar, aoIr, aoSair, gravidade, aoGravidade, erroGravidade }: Props) {
   const { passo, item, tela, modulo } = atual;
   const r = resp[passo.id];
   const estado = estadoPasso(r);
@@ -344,6 +347,29 @@ export default function Execucao({ atual, fila, posicao, resp, chave, slug, some
                       <div role="alert">{erroAnexo && <p className="mt-1 text-sm text-rose-800">{erroAnexo}</p>}</div>
                       {miniaturas}
                     </div>
+                  )}
+
+                  {r.resultado === "diferente" && aoGravidade && (
+                    <fieldset className="mt-5 rounded-md border border-rose-200 bg-rose-50/50 p-3">
+                      <legend className="px-1 text-sm font-semibold">Quão grave é esta falha?</legend>
+                      <p className="text-xs text-slate-700">Vale para a funcionalidade “{item.nome}” inteira. Sem escolher, conta como “Impede de usar” e a homologação não pode ser concluída.</p>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        {SEVERIDADES.map((sv) => (
+                          <label
+                            key={sv}
+                            className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-indigo-600 ${
+                              gravidade?.[item.id] === sv ? "border-rose-600 bg-rose-50 text-rose-950" : "border-slate-400 bg-white hover:bg-slate-50"
+                            }`}
+                          >
+                            <input type="radio" name={`grav-${item.id}`} className="sr-only" checked={gravidade?.[item.id] === sv} onChange={() => aoGravidade(item.id, sv)} />
+                            {ROTULO_SEVERIDADE[sv]}
+                          </label>
+                        ))}
+                      </div>
+                      <p role="status" className="mt-2 text-sm text-slate-800">
+                        {erroGravidade ? <span className="font-semibold text-rose-800">{erroGravidade}</span> : gravidade?.[item.id] ? `Gravidade escolhida: ${ROTULO_SEVERIDADE[gravidade[item.id]]}.` : "Gravidade ainda não informada."}
+                      </p>
+                    </fieldset>
                   )}
                 </div>
               )}
