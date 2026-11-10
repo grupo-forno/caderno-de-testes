@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
+import { juntarInstrucoes, semDuplicados, separarInstrucoes } from "@/lib/listas";
 import { lerPassos } from "@/lib/passos";
 import type { Item } from "@/lib/tipos";
 import { hashDaChave, novaChave } from "@/lib/validador";
@@ -22,6 +23,9 @@ const opc = (f: FormData, k: string) => txt(f, k) || null;
 const ehUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 // uma linha = um título (para criar vários módulos ou telas de uma vez)
 const linhas = (f: FormData, k: string) => txt(f, k).split("\n").map((s) => s.trim()).filter(Boolean).slice(0, 100);
+
+// nomes ignorados por já existirem: vão na volta da página, para ela avisar quais foram
+const avisoIgnorados = (l: string[]) => (l.length ? `&ignorados=${encodeURIComponent(l.slice(0, 10).join("\n"))}` : "");
 
 const MAX_TENTATIVAS = 8; // senhas erradas por endereço (IP) a cada 15 minutos
 
@@ -53,15 +57,15 @@ function gerarSlug(titulo: string) {
 export async function criarCaderno(f: FormData) {
   await exigirAdmin();
   const titulo = txt(f, "titulo");
-  if (!titulo) redirect("/admin?erro=titulo");
+  if (!titulo) redirect("/admin/novo?erro=titulo");
   const [c] = await sql`
     insert into cadernos (slug, titulo, versao, preparado_por, antes)
-    values (${gerarSlug(titulo)}, ${titulo}, ${txt(f, "versao") || "1.0"}, ${txt(f, "preparado_por")}, ${txt(f, "antes")})
+    values (${gerarSlug(titulo)}, ${titulo}, ${txt(f, "versao") || "1.0"}, ${txt(f, "preparado_por")}, ${juntarInstrucoes(separarInstrucoes(txt(f, "antes")))})
     returning id`;
-  // módulos já cadastrados na criação (opcional): um por linha
-  const mods = linhas(f, "modulos");
+  // módulos já cadastrados na criação (opcional): um por linha, sem repetir nome
+  const { novos: mods, ignorados } = semDuplicados(linhas(f, "modulos"));
   if (mods.length) await sql.transaction(mods.map((m, i) => sql`insert into modulos (caderno_id, ordem, titulo) values (${c.id}, ${i + 1}, ${m})`));
-  redirect(`/admin/${c.id}`);
+  redirect(`/admin/${c.id}?criado=1${avisoIgnorados(ignorados)}`);
 }
 
 export async function salvarCaderno(id: string, f: FormData) {
@@ -71,7 +75,7 @@ export async function salvarCaderno(id: string, f: FormData) {
   // endereço do ambiente de teste: opcional, só http(s)
   const ambiente = opc(f, "ambiente_url");
   if (ambiente && !/^https?:$/.test((() => { try { return new URL(ambiente).protocol; } catch { return ""; } })())) redirect(`/admin/${id}?erro=ambiente`);
-  await sql`update cadernos set titulo = ${titulo}, versao = ${txt(f, "versao") || "1.0"}, preparado_por = ${txt(f, "preparado_por")}, antes = ${txt(f, "antes")}, ambiente_url = ${ambiente}, atualizado = now() where id = ${id}`;
+  await sql`update cadernos set titulo = ${titulo}, versao = ${txt(f, "versao") || "1.0"}, preparado_por = ${txt(f, "preparado_por")}, antes = ${juntarInstrucoes(separarInstrucoes(txt(f, "antes")))}, ambiente_url = ${ambiente}, atualizado = now() where id = ${id}`;
   redirect(`/admin/${id}?salvo=1`);
 }
 
@@ -99,11 +103,15 @@ export async function excluirCaderno(id: string) {
 export async function criarModulos(cadernoId: string, f: FormData) {
   await exigirAdmin();
   await naoSeConcluido(cadernoId);
-  const titulos = linhas(f, "titulos");
-  if (!titulos.length) redirect(`/admin/${cadernoId}?erro=modulos`);
+  const pedidos = linhas(f, "titulos");
+  if (!pedidos.length) redirect(`/admin/${cadernoId}?erro=modulos`);
+  // não repete nome (nem o de um módulo que já existe no caderno): o que sobrar é criado e o resto é informado
+  const existentes = (await sql`select titulo from modulos where caderno_id = ${cadernoId}`).map((m) => m.titulo as string);
+  const { novos: titulos, ignorados } = semDuplicados(pedidos, existentes);
+  if (!titulos.length) redirect(`/admin/${cadernoId}?erro=modulos_repetidos${avisoIgnorados(ignorados)}`);
   const [{ n }] = await sql`select coalesce(max(ordem), 0)::int as n from modulos where caderno_id = ${cadernoId}`;
   await sql.transaction(titulos.map((t, i) => sql`insert into modulos (caderno_id, ordem, titulo) values (${cadernoId}, ${n + i + 1}, ${t})`));
-  redirect(`/admin/${cadernoId}?salvo=1`);
+  redirect(`/admin/${cadernoId}?salvo=1${avisoIgnorados(ignorados)}`);
 }
 
 export async function renomearModulo(cadernoId: string, moduloId: string, f: FormData) {

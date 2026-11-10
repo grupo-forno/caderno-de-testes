@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import AceiteAdmin from "@/components/AceiteAdmin";
 import AdminBar from "@/components/AdminBar";
 import FerramentasPlanilha from "@/components/FerramentasPlanilha";
+import ListaInstrucoes from "@/components/ListaInstrucoes";
+import ListaModulos from "@/components/ListaModulos";
 import { ChipStatus } from "@/components/StatusBadge";
 import { btn, btn2, campo } from "@/components/estilos";
 import { Confirmar, CopiarLink } from "@/components/ui";
@@ -11,6 +13,7 @@ import { exigirAdmin } from "@/lib/admin";
 import { consolidado } from "@/lib/consolidado";
 import { sql } from "@/lib/db";
 import { dataHora } from "@/lib/formatar";
+import { separarInstrucoes } from "@/lib/listas";
 import { juntar, resumoTela, type ResumoTela } from "@/lib/status";
 import type { Resultado, Tela } from "@/lib/tipos";
 import { criarModulos, criarTelasEmLote, excluirCaderno, excluirModulo, excluirTela, marcarCorrigido, moverModulo, moverTela, renomearModulo, salvarCaderno } from "../actions";
@@ -27,7 +30,8 @@ const link = `inline-flex min-h-11 items-center text-sm text-indigo-800 underlin
 
 const ERROS: Record<string, string> = {
   tela: "Esta tela foi excluída em outro lugar, então não foi possível salvar. Confira a lista de telas abaixo.",
-  modulos: "Escreva pelo menos um nome de módulo (um por linha).",
+  modulos: "Escreva pelo menos um nome de módulo e clique em Adicionar antes de salvar.",
+  modulos_repetidos: "Todos esses nomes já existem neste caderno, então nada foi criado.",
   modulo_nome: "Escreva o novo nome do módulo.",
   modulo: "Esse módulo não existe mais. Recarregue a página e confira a lista.",
   telas: "Escreva pelo menos um nome de tela (um por linha).",
@@ -39,7 +43,9 @@ const ERROS: Record<string, string> = {
 export default async function Page({ params, searchParams }: PageProps<"/admin/[id]">) {
   await exigirAdmin();
   const { id } = await params;
-  const { erro, salvo, reaberta } = await searchParams;
+  const { erro, salvo, reaberta, criado, ignorados } = await searchParams;
+  const nomesIgnorados = typeof ignorados === "string" ? ignorados.split("\n").filter(Boolean).slice(0, 10) : [];
+  const erroModulos = erro === "modulos" || erro === "modulos_repetidos"; // aparece junto do campo, não no topo
   const [c] = await sql`select * from cadernos where id::text = ${id}`;
   if (!c) notFound();
   const modulos = await sql`select id, titulo from modulos where caderno_id = ${id} order by ordem`;
@@ -89,8 +95,23 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
       <main className="mx-auto max-w-4xl px-4 py-8">
         <Link href="/admin" className="text-sm text-indigo-800 hover:underline">← Todos os cadernos</Link>
         <h1 className="mt-2 text-2xl font-semibold">{c.titulo}</h1>
+        {criado && (
+          <div role="status" className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+            <p className="font-semibold">Caderno criado.</p>
+            {modulos.length === 0 ? (
+              <>
+                <p className="mt-1">Próximo passo: monte a estrutura do sistema.</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <a href="#adicionar-modulos" className={btn + " inline-flex min-h-11 items-center"}>Adicionar primeiro módulo</a>
+                  <Link href={`/admin/${id}/importar`} className={btn2 + " inline-flex min-h-11 items-center"}>Importar estrutura</Link>
+                </div>
+              </>
+            ) : <p className="mt-1">Próximo passo: cadastre as telas de cada módulo, ou importe a estrutura de uma planilha.</p>}
+          </div>
+        )}
         {salvo && <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">Salvo.</p>}
-        {typeof erro === "string" && ERROS[erro] && <p role="alert" className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">{ERROS[erro]}</p>}
+        {nomesIgnorados.length > 0 && <p role="status" className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">{nomesIgnorados.length === 1 ? "Este nome já existia e foi ignorado" : "Estes nomes já existiam e foram ignorados"}: {nomesIgnorados.join(", ")}.</p>}
+        {typeof erro === "string" && !erroModulos && ERROS[erro] && <p role="alert" className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">{ERROS[erro]}</p>}
 
         <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
           <h2 className="font-semibold">Link para o cliente</h2>
@@ -170,19 +191,17 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             Dá para cadastrar todos os módulos e telas de uma vez, só com o nome. Eles aparecem no menu do cliente como “Em preparação” até você cadastrar as funcionalidades de cada tela.
           </p>
 
-          <details className="mt-4 rounded-md border border-slate-300 bg-slate-50" open={modulos.length === 0}>
+          <details id="adicionar-modulos" className="mt-4 scroll-mt-4 rounded-md border border-slate-300 bg-slate-50" open={modulos.length === 0 || erroModulos}>
             <summary className={`flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm font-medium ${FOCO}`}>Adicionar módulos</summary>
             <form action={criarModulos.bind(null, id)} className="space-y-3 border-t border-slate-200 p-3">
-              <label className="block text-sm font-medium">
-                Um módulo por linha
-                <textarea name="titulos" rows={4} required placeholder={"Menu inicial\nFinanceiro\nRH\nCompras\nEstoque"} className={campo} />
-              </label>
-              <button className={btn + " min-h-11"}>Criar módulos</button>
+              <ListaModulos campo="titulos" existentes={modulos.map((m) => m.titulo as string)} />
+              {erroModulos && typeof erro === "string" && <p role="alert" className="text-sm text-rose-800">{ERROS[erro]}</p>}
+              <button className={btn + " min-h-11"}>Salvar módulos</button>
             </form>
           </details>
 
           {modulos.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-700">Nenhum módulo ainda. Crie os módulos acima para começar a cadastrar as telas.</p>
+            <p className="mt-4 text-sm text-slate-700">Nenhum módulo ainda. Adicione os módulos acima para começar a cadastrar as telas.</p>
           ) : (
             <div className="mt-4 space-y-4">
               {modulos.map((m, mi) => {
@@ -326,7 +345,10 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
               <input name="ambiente_url" type="url" defaultValue={c.ambiente_url ?? ""} placeholder="https://" className={campo} />
               <span className="mt-1 block text-xs font-normal text-slate-600">Se preencher, o validador vê o botão “Abrir ambiente de teste” logo na entrada do caderno.</span>
             </label>
-            <label className="block text-sm font-medium sm:col-span-2">Antes de começar (um item por linha)<textarea name="antes" rows={3} defaultValue={c.antes} className={campo} /></label>
+            <fieldset className="sm:col-span-2">
+              <legend className="text-sm font-medium">Antes de começar</legend>
+              <div className="mt-1"><ListaInstrucoes campo="antes" inicial={separarInstrucoes(String(c.antes ?? ""))} /></div>
+            </fieldset>
             <div className="sm:col-span-2"><button className={btn + " min-h-11"}>Salvar</button></div>
           </form>
           <form action={excluirCaderno.bind(null, id)} className="mt-6 border-t border-slate-100 pt-4">

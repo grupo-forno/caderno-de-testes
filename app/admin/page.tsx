@@ -3,7 +3,7 @@ import AdminBar from "@/components/AdminBar";
 import { btn, campo } from "@/components/estilos";
 import { ehAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
-import { criarCaderno, entrar } from "./actions";
+import { entrar } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +47,16 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
     <>
       <AdminBar />
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <h1 className="text-2xl font-semibold">Seus cadernos</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-semibold">Seus cadernos</h1>
+          <Link href="/admin/novo" className={btn + " inline-flex min-h-11 items-center"}>+ Novo caderno</Link>
+        </div>
         {cadernos.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-700">Você ainda não tem nenhum caderno. Crie o primeiro abaixo.</p>
+          <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
+            <p className="font-semibold">Você ainda não tem nenhum caderno.</p>
+            <p className="mx-auto mt-1 max-w-md text-sm text-slate-700">Um caderno é o sistema inteiro. Dentro dele ficam os módulos (Financeiro, RH, Compras…) e, em cada módulo, as telas.</p>
+            <Link href="/admin/novo" className={btn + " mt-4 inline-flex min-h-11 items-center"}>+ Novo caderno</Link>
+          </div>
         ) : (
           <ul className="mt-4 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
             {cadernos.map((c) => (
@@ -66,34 +73,6 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
             ))}
           </ul>
         )}
-
-        <h2 className="mt-10 text-lg font-semibold">Novo caderno</h2>
-        <p className="mt-1 text-sm text-slate-700">Um caderno é o sistema inteiro. Dentro dele ficam os módulos (Financeiro, RH, Compras…) e, em cada módulo, as telas.</p>
-        <form action={criarCaderno} className="mt-3 grid gap-4 rounded-lg border border-slate-200 bg-white p-5 sm:grid-cols-2">
-          <label className="block text-sm font-medium sm:col-span-2">
-            Nome do sistema
-            <input name="titulo" required placeholder="Ex.: Sistema de gestão" className={campo} />
-          </label>
-          {erro === "titulo" && <p role="alert" className="text-sm text-rose-800 sm:col-span-2">Escreva o nome do caderno.</p>}
-          <label className="block text-sm font-medium">
-            Versão
-            <input name="versao" defaultValue="1.0" className={campo} />
-          </label>
-          <label className="block text-sm font-medium">
-            Preparado por
-            <input name="preparado_por" className={campo} />
-          </label>
-          <label className="block text-sm font-medium sm:col-span-2">
-            Módulos (um por linha, opcional)
-            <textarea name="modulos" rows={4} placeholder={"Menu inicial\nFinanceiro\nRH\nCompras\nEstoque"} className={campo} />
-            <span className="mt-1 block text-xs font-normal text-slate-700">Se preferir, deixe vazio e crie os módulos depois, na página do caderno.</span>
-          </label>
-          <label className="block text-sm font-medium sm:col-span-2">
-            Antes de começar (um item por linha)
-            <textarea name="antes" rows={3} placeholder={"Um computador ou celular com internet.\nCerca de 30 minutos livres."} className={campo} />
-          </label>
-          <div className="sm:col-span-2"><button className={btn + " min-h-11"}>Criar caderno</button></div>
-        </form>
       </main>
     </>
   );
