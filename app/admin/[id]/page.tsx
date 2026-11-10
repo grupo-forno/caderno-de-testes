@@ -3,11 +3,15 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import AceiteAdmin from "@/components/AceiteAdmin";
 import AdminBar from "@/components/AdminBar";
+import Aviso from "@/components/Aviso";
+import BotaoEnviar from "@/components/BotaoEnviar";
+import CabecalhoPagina from "@/components/CabecalhoPagina";
 import FerramentasPlanilha from "@/components/FerramentasPlanilha";
 import ListaInstrucoes from "@/components/ListaInstrucoes";
 import ListaModulos from "@/components/ListaModulos";
 import { ChipStatus } from "@/components/StatusBadge";
-import { btn, btn2, campo } from "@/components/estilos";
+import { btn, btn2, botao, campo } from "@/components/estilos";
+import { FileUp, ListPlus, Plus } from "lucide-react";
 import { Confirmar, CopiarLink } from "@/components/ui";
 import { exigirAdmin } from "@/lib/admin";
 import { consolidado } from "@/lib/consolidado";
@@ -93,25 +97,33 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
     <>
       <AdminBar />
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <Link href="/admin" className="text-sm text-indigo-800 hover:underline">← Todos os cadernos</Link>
-        <h1 className="mt-2 text-2xl font-semibold">{c.titulo}</h1>
+        <CabecalhoPagina migalhas={[{ rotulo: "Seus cadernos", href: "/admin" }, { rotulo: c.titulo }]} titulo={c.titulo} />
         {criado && (
-          <div role="status" className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
-            <p className="font-semibold">Caderno criado.</p>
-            {modulos.length === 0 ? (
-              <>
-                <p className="mt-1">Próximo passo: monte a estrutura do sistema.</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <a href="#adicionar-modulos" className={btn + " inline-flex min-h-11 items-center"}>Adicionar primeiro módulo</a>
-                  <Link href={`/admin/${id}/importar`} className={btn2 + " inline-flex min-h-11 items-center"}>Importar estrutura</Link>
-                </div>
-              </>
-            ) : <p className="mt-1">Próximo passo: cadastre as telas de cada módulo, ou importe a estrutura de uma planilha.</p>}
-          </div>
+          <Aviso
+            tom="sucesso"
+            titulo="Caderno criado."
+            className="mb-3"
+            acoes={
+              modulos.length === 0 ? (
+                <>
+                  <a href="#adicionar-modulos" className={botao("primario")}>
+                    <Plus aria-hidden="true" />
+                    Adicionar primeiro módulo
+                  </a>
+                  <Link href={`/admin/${id}/importar`} className={botao("secundario")}>
+                    <FileUp aria-hidden="true" />
+                    Importar estrutura
+                  </Link>
+                </>
+              ) : undefined
+            }
+          >
+            {modulos.length === 0 ? "Próximo passo: monte a estrutura do sistema." : "Próximo passo: cadastre as telas de cada módulo, ou importe a estrutura de uma planilha."}
+          </Aviso>
         )}
-        {salvo && <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">Salvo.</p>}
-        {nomesIgnorados.length > 0 && <p role="status" className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">{nomesIgnorados.length === 1 ? "Este nome já existia e foi ignorado" : "Estes nomes já existiam e foram ignorados"}: {nomesIgnorados.join(", ")}.</p>}
-        {typeof erro === "string" && !erroModulos && ERROS[erro] && <p role="alert" className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">{ERROS[erro]}</p>}
+        {salvo && <Aviso tom="sucesso" className="mb-3">Salvo.</Aviso>}
+        {nomesIgnorados.length > 0 && <Aviso tom="alerta" className="mb-3">{nomesIgnorados.length === 1 ? "Este nome já existia e foi ignorado" : "Estes nomes já existiam e foram ignorados"}: {nomesIgnorados.join(", ")}.</Aviso>}
+        {typeof erro === "string" && !erroModulos && ERROS[erro] && <Aviso tom="erro" className="mb-3">{ERROS[erro]}</Aviso>}
 
         <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
           <h2 className="font-semibold">Link para o cliente</h2>
@@ -191,12 +203,15 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             Dá para cadastrar todos os módulos e telas de uma vez, só com o nome. Eles aparecem no menu do cliente como “Em preparação” até você cadastrar as funcionalidades de cada tela.
           </p>
 
-          <details id="adicionar-modulos" className="mt-4 scroll-mt-4 rounded-md border border-slate-300 bg-slate-50" open={modulos.length === 0 || erroModulos}>
-            <summary className={`flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm font-medium ${FOCO}`}>Adicionar módulos</summary>
-            <form action={criarModulos.bind(null, id)} className="space-y-3 border-t border-slate-200 p-3">
+          <details id="adicionar-modulos" className="mt-4 scroll-mt-4" open={modulos.length === 0 || erroModulos}>
+            <summary className={botao("secundario", "w-fit cursor-pointer list-none [&::-webkit-details-marker]:hidden")}>
+              <ListPlus aria-hidden="true" />
+              Adicionar módulos
+            </summary>
+            <form action={criarModulos.bind(null, id)} className="mt-2 space-y-3 rounded-md border border-slate-300 bg-slate-50 p-3">
               <ListaModulos campo="titulos" existentes={modulos.map((m) => m.titulo as string)} />
-              {erroModulos && typeof erro === "string" && <p role="alert" className="text-sm text-rose-800">{ERROS[erro]}</p>}
-              <button className={btn + " min-h-11"}>Salvar módulos</button>
+              {erroModulos && typeof erro === "string" && <Aviso tom="erro">{ERROS[erro]}</Aviso>}
+              <BotaoEnviar pendente="Salvando módulos…">Salvar módulos</BotaoEnviar>
             </form>
           </details>
 
@@ -349,7 +364,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
               <legend className="text-sm font-medium">Antes de começar</legend>
               <div className="mt-1"><ListaInstrucoes campo="antes" inicial={separarInstrucoes(String(c.antes ?? ""))} /></div>
             </fieldset>
-            <div className="sm:col-span-2"><button className={btn + " min-h-11"}>Salvar</button></div>
+            <div className="sm:col-span-2"><BotaoEnviar>Salvar</BotaoEnviar></div>
           </form>
           <form action={excluirCaderno.bind(null, id)} className="mt-6 border-t border-slate-100 pt-4">
             <Confirmar texto="Excluir este caderno inteiro, com os módulos, as telas, as respostas dos clientes e o histórico? Não dá para desfazer." className={btn2 + " min-h-11"}>Excluir caderno</Confirmar>

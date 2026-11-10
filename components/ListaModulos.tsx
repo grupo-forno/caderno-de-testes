@@ -1,11 +1,10 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { btn, btn2, campo } from "@/components/estilos";
+import { ArrowDown, ArrowUp, ClipboardPaste, Plus, Trash2 } from "lucide-react";
+import Aviso from "@/components/Aviso";
+import { botao, botaoIcone, campo } from "@/components/estilos";
 import { MODULOS_SUGERIDOS, semDuplicados } from "@/lib/listas";
-
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
-const seta = `min-h-11 min-w-11 rounded border border-slate-400 bg-white px-2 text-sm hover:bg-slate-50 disabled:opacity-30 ${FOCO}`;
 
 // Módulos montados aos poucos: nome + "Adicionar" (ou Enter), atalhos, lista com remover e reordenar, e "Colar lista" como opção.
 // Nada é salvo aqui: a lista vai no formulário de quem usa, num campo escondido com um nome por linha.
@@ -14,21 +13,19 @@ export default function ListaModulos({ campo: nomeCampo, existentes = [] }: { ca
   const [nomes, setNomes] = useState<string[]>([]);
   const [texto, setTexto] = useState("");
   const [colado, setColado] = useState("");
-  const [aviso, setAviso] = useState("");
+  const [aviso, setAviso] = useState<{ tom: "sucesso" | "alerta"; texto: string } | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
 
   function adicionar(novos: string[]) {
     const r = semDuplicados(novos, [...existentes, ...nomes]);
     if (r.novos.length) setNomes((n) => [...n, ...r.novos]);
-    setAviso(
-      r.ignorados.length
-        ? `${r.ignorados.length === 1 ? "Este nome já existia e foi ignorado" : "Estes nomes já existiam e foram ignorados"}: ${r.ignorados.join(", ")}.`
-        : r.novos.length ? `${r.novos.length === 1 ? "Módulo adicionado" : `${r.novos.length} módulos adicionados`}.` : "",
-    );
+    if (r.ignorados.length) setAviso({ tom: "alerta", texto: `${r.ignorados.length === 1 ? "Este nome já existia e foi ignorado" : "Estes nomes já existiam e foram ignorados"}: ${r.ignorados.join(", ")}.` });
+    else if (r.novos.length) setAviso({ tom: "sucesso", texto: `${r.novos.length === 1 ? "Módulo adicionado" : `${r.novos.length} módulos adicionados`}.` });
+    else setAviso(null);
     return r.novos.length;
   }
   function adicionarDigitado() {
-    if (!texto.trim()) return setAviso("Escreva o nome do módulo antes de adicionar.");
+    if (!texto.trim()) return setAviso({ tom: "alerta", texto: "Escreva o nome do módulo antes de adicionar." });
     adicionar([texto]);
     setTexto("");
     entrada.current?.focus();
@@ -48,6 +45,7 @@ export default function ListaModulos({ campo: nomeCampo, existentes = [] }: { ca
     <div>
       <input type="hidden" name={nomeCampo} value={aEnviar.join("\n")} />
       <label htmlFor={`${id}-nome`} className="block text-sm font-medium">Nome do módulo</label>
+      <p className="mt-0.5 text-xs text-slate-700">Escreva o nome e aperte Enter, ou use o botão Adicionar.</p>
       <div className="mt-1 flex flex-wrap gap-2">
         <input
           id={`${id}-nome`}
@@ -62,12 +60,14 @@ export default function ListaModulos({ campo: nomeCampo, existentes = [] }: { ca
             }
           }}
           placeholder="Ex.: Financeiro"
-          aria-describedby={`${id}-aviso`}
-          className={campo + " mt-0 min-h-11 min-w-0 flex-1"}
+          className={campo + " mt-0 min-h-11 min-w-0 flex-1 sm:min-h-10"}
         />
-        <button type="button" onClick={adicionarDigitado} className={`${btn2} min-h-11 ${FOCO}`}>Adicionar</button>
+        <button type="button" onClick={adicionarDigitado} className={botao("secundario")}>
+          <Plus aria-hidden="true" />
+          Adicionar
+        </button>
       </div>
-      <p id={`${id}-aviso`} role="status" className="mt-1 min-h-5 text-sm text-slate-800">{aviso}</p>
+      <div className="mt-2 min-h-5">{aviso && <Aviso tom={aviso.tom}>{aviso.texto}</Aviso>}</div>
 
       {sugestoes.length > 0 && (
         <div className="mt-2">
@@ -75,7 +75,10 @@ export default function ListaModulos({ campo: nomeCampo, existentes = [] }: { ca
           <ul className="mt-1 flex flex-wrap gap-2">
             {sugestoes.map((s) => (
               <li key={s}>
-                <button type="button" onClick={() => adicionar([s])} className={`min-h-11 rounded-full border border-slate-400 bg-white px-3 text-sm hover:bg-slate-50 ${FOCO}`}>+ {s}</button>
+                <button type="button" onClick={() => adicionar([s])} className={botao("secundario", "rounded-full")}>
+                  <Plus aria-hidden="true" />
+                  {s}
+                </button>
               </li>
             ))}
           </ul>
@@ -92,21 +95,34 @@ export default function ListaModulos({ campo: nomeCampo, existentes = [] }: { ca
               <span className="w-6 text-sm text-slate-600">{i + 1}.</span>
               <span className="min-w-[9rem] flex-1 break-words text-sm font-medium">{n}</span>
               <div className="flex gap-2">
-              <button type="button" disabled={i === 0} onClick={() => mover(i, -1)} aria-label={`Subir ${n}`} className={seta}>↑</button>
-              <button type="button" disabled={i === nomes.length - 1} onClick={() => mover(i, 1)} aria-label={`Descer ${n}`} className={seta}>↓</button>
-              <button type="button" onClick={() => { setNomes((x) => x.filter((y) => y !== n)); setAviso(`“${n}” foi removido da lista.`); }} aria-label={`Remover ${n}`} className={`min-h-11 rounded border border-slate-400 bg-white px-3 text-sm text-rose-800 hover:bg-rose-50 ${FOCO}`}>Remover</button>
+                <button type="button" disabled={i === 0} onClick={() => mover(i, -1)} aria-label={`Mover o módulo ${n} para cima`} title="Mover para cima" className={botaoIcone("secundario")}>
+                  <ArrowUp aria-hidden="true" />
+                </button>
+                <button type="button" disabled={i === nomes.length - 1} onClick={() => mover(i, 1)} aria-label={`Mover o módulo ${n} para baixo`} title="Mover para baixo" className={botaoIcone("secundario")}>
+                  <ArrowDown aria-hidden="true" />
+                </button>
+                <button type="button" onClick={() => { setNomes((x) => x.filter((y) => y !== n)); setAviso({ tom: "sucesso", texto: `“${n}” foi removido da lista.` }); }} aria-label={`Remover o módulo ${n}`} className={botao("destrutivo")}>
+                  <Trash2 aria-hidden="true" />
+                  Remover
+                </button>
               </div>
             </li>
           ))}
         </ol>
       )}
 
-      <details className="mt-3 rounded-md border border-slate-300 bg-slate-50">
-        <summary className={`flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm font-medium ${FOCO}`}>Colar lista (um nome por linha)</summary>
-        <div className="space-y-2 border-t border-slate-200 p-3">
+      <details className="group mt-3">
+        <summary className={botao("discreto", "w-fit cursor-pointer list-none [&::-webkit-details-marker]:hidden")}>
+          <ClipboardPaste aria-hidden="true" />
+          Colar lista (um nome por linha)
+        </summary>
+        <div className="mt-2 space-y-2 rounded-md border border-slate-300 bg-slate-50 p-3">
           <label htmlFor={`${id}-colar`} className="block text-sm font-medium">Cole vários nomes de uma vez</label>
           <textarea id={`${id}-colar`} value={colado} onChange={(e) => setColado(e.target.value)} rows={4} placeholder={"Menu inicial\nFinanceiro\nRH"} className={campo + " mt-0"} />
-          <button type="button" onClick={() => { if (adicionar(colado.split("\n")) || !colado.trim()) setColado(""); }} className={`${btn} min-h-11 ${FOCO}`}>Adicionar à lista</button>
+          <button type="button" onClick={() => { if (adicionar(colado.split("\n")) || !colado.trim()) setColado(""); }} className={botao("primario")}>
+            <Plus aria-hidden="true" />
+            Adicionar à lista
+          </button>
         </div>
       </details>
     </div>

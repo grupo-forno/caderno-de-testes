@@ -1,11 +1,21 @@
 import Link from "next/link";
+import { AlertTriangle, BookOpen, CheckCircle2, CircleDashed, ClipboardList, History, LogIn, MessageSquareText, Plus } from "lucide-react";
 import AdminBar from "@/components/AdminBar";
-import { btn, campo } from "@/components/estilos";
+import Aviso from "@/components/Aviso";
+import BotaoEnviar from "@/components/BotaoEnviar";
+import CabecalhoPagina from "@/components/CabecalhoPagina";
+import Campo from "@/components/Campo";
+import EstadoVazio from "@/components/EstadoVazio";
+import Etiqueta from "@/components/Etiqueta";
+import MenuAcoes from "@/components/MenuAcoes";
+import { botao } from "@/components/estilos";
 import { ehAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
 import { entrar } from "./actions";
 
 export const dynamic = "force-dynamic";
+
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 export default async function Page({ searchParams }: PageProps<"/admin">) {
   const { erro } = await searchParams;
@@ -15,16 +25,16 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
       <main className="mx-auto max-w-sm px-4 py-16">
         <h1 className="text-xl font-semibold">Área de quem monta os cadernos</h1>
         <form action={entrar} className="mt-5 space-y-4 rounded-lg border border-slate-200 bg-white p-5">
-          <label className="block text-sm font-medium">
-            Senha
-            <input name="senha" type="password" required autoFocus className={campo} />
-          </label>
+          <Campo rotulo="Senha" nome="senha" type="password" obrigatorio autoFocus />
           {erro === "espere" ? (
-            <p role="alert" className="text-sm text-rose-800">Muitas tentativas seguidas. Espere 15 minutos e tente de novo.</p>
+            <Aviso tom="erro">Muitas tentativas seguidas. Espere 15 minutos e tente de novo.</Aviso>
           ) : erro ? (
-            <p role="alert" className="text-sm text-rose-800">Senha incorreta. Confira e tente de novo.</p>
+            <Aviso tom="erro">Senha incorreta. Confira e tente de novo.</Aviso>
           ) : null}
-          <button className={btn + " min-h-11 w-full"}>Entrar</button>
+          <BotaoEnviar pendente="Entrando…" className="w-full">
+            <LogIn aria-hidden="true" />
+            Entrar
+          </BotaoEnviar>
         </form>
       </main>
     );
@@ -41,34 +51,52 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
       (select count(distinct r.email) from respostas_item r where r.caderno = c.slug)::int as pessoas
     from cadernos c order by c.atualizado desc`;
 
-  const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+  const novo = (
+    <Link href="/admin/novo" className={botao("primario")}>
+      <Plus aria-hidden="true" />
+      Novo caderno
+    </Link>
+  );
 
   return (
     <>
       <AdminBar />
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold">Seus cadernos</h1>
-          <Link href="/admin/novo" className={btn + " inline-flex min-h-11 items-center"}>+ Novo caderno</Link>
-        </div>
+        <CabecalhoPagina titulo="Seus cadernos" acoes={novo} />
         {cadernos.length === 0 ? (
-          <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
-            <p className="font-semibold">Você ainda não tem nenhum caderno.</p>
-            <p className="mx-auto mt-1 max-w-md text-sm text-slate-700">Um caderno é o sistema inteiro. Dentro dele ficam os módulos (Financeiro, RH, Compras…) e, em cada módulo, as telas.</p>
-            <Link href="/admin/novo" className={btn + " mt-4 inline-flex min-h-11 items-center"}>+ Novo caderno</Link>
-          </div>
+          <EstadoVazio icone={BookOpen} titulo="Você ainda não tem nenhum caderno." acao={novo}>
+            Um caderno é o sistema inteiro. Dentro dele ficam os módulos (Financeiro, RH, Compras…) e, em cada módulo, as telas.
+          </EstadoVazio>
         ) : (
-          <ul className="mt-4 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+          <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
             {cadernos.map((c) => (
-              <li key={c.id}>
-                <Link href={`/admin/${c.id}`} className="flex min-h-11 flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-indigo-600">
-                  <span className="font-medium">{c.titulo}</span>
-                  <span className="text-sm text-slate-700">
-                    Versão {c.versao} · {plural(c.modulos, "módulo", "módulos")} · {plural(c.telas, "tela", "telas")} · {plural(c.funcionalidades, "funcionalidade", "funcionalidades")} ·{" "}
-                    {c.pessoas} {c.pessoas === 1 ? "pessoa respondeu" : "pessoas responderam"}
-                    {c.nao_ok > 0 && <strong className="text-rose-800"> · {c.nao_ok} NÃO OK para corrigir</strong>}
-                  </span>
-                </Link>
+              <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+                <div className="min-w-0 flex-1 basis-64">
+                  <Link href={`/admin/${c.id}`} className="break-words font-semibold text-indigo-900 underline decoration-indigo-300 underline-offset-4 hover:decoration-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                    {c.titulo}
+                  </Link>
+                  <p className="mt-0.5 text-sm text-slate-700">
+                    Versão {c.versao} · {plural(c.modulos, "módulo", "módulos")} · {plural(c.telas, "tela", "telas")} · {plural(c.funcionalidades, "funcionalidade", "funcionalidades")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {c.nao_ok > 0 ? (
+                    <Etiqueta tom="erro" icone={AlertTriangle}>{c.nao_ok} NÃO OK para corrigir</Etiqueta>
+                  ) : c.pessoas > 0 ? (
+                    <Etiqueta tom="sucesso" icone={CheckCircle2}>Sem NÃO OK · {plural(c.pessoas, "pessoa respondeu", "pessoas responderam")}</Etiqueta>
+                  ) : (
+                    <Etiqueta icone={CircleDashed}>Ninguém respondeu ainda</Etiqueta>
+                  )}
+                  <MenuAcoes
+                    rotulo={`Mais ações do caderno ${c.titulo}`}
+                    itens={[
+                      { rotulo: "Ver respostas", href: `/admin/${c.id}/respostas`, icone: <MessageSquareText /> },
+                      { rotulo: "Ver histórico", href: `/admin/${c.id}/historico`, icone: <History /> },
+                      { rotulo: "Rodadas de homologação", href: `/admin/${c.id}/rodadas`, icone: <ClipboardList /> },
+                      { rotulo: "Biblioteca de testes", href: `/admin/${c.id}/biblioteca`, icone: <BookOpen /> },
+                    ]}
+                  />
+                </div>
               </li>
             ))}
           </ul>

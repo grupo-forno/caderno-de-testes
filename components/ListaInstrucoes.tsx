@@ -1,11 +1,10 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { btn2, campo } from "@/components/estilos";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { botao, botaoIcone, campo } from "@/components/estilos";
 import { juntarInstrucoes } from "@/lib/listas";
 
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
-const seta = `min-h-11 min-w-11 rounded border border-slate-400 bg-white px-2 text-sm hover:bg-slate-50 disabled:opacity-30 ${FOCO}`;
 type Linha = { k: number; v: string };
 
 // "Antes de começar": uma lista ordenada de instruções, cada uma num campo. Vai no formulário de quem usa
@@ -77,18 +76,28 @@ export default function ListaInstrucoes({ campo: nomeCampo, inicial }: { campo: 
                   }
                 }}
                 placeholder="Ex.: Um computador ou celular com internet."
-                className={campo + " min-h-11"}
+                className={campo + " min-h-11 sm:min-h-10"}
               />
               <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" ref={aoMontar(alvo(l.k, "sobe"))} disabled={i === 0} onClick={() => mover(i, -1)} aria-label={`Subir a instrução ${i + 1}`} className={seta}>↑ Subir</button>
-                <button type="button" ref={aoMontar(alvo(l.k, "desce"))} disabled={i === linhas.length - 1} onClick={() => mover(i, 1)} aria-label={`Descer a instrução ${i + 1}`} className={seta}>↓ Descer</button>
-                <button type="button" onClick={() => remover(i)} aria-label={`Remover a instrução ${i + 1}`} className={`min-h-11 rounded border border-slate-400 bg-white px-3 text-sm text-rose-800 hover:bg-rose-50 ${FOCO}`}>Remover</button>
+                <button type="button" ref={aoMontar(alvo(l.k, "sobe"))} disabled={i === 0} onClick={() => mover(i, -1)} aria-label={`Mover a instrução ${i + 1} para cima`} title="Mover para cima" className={botaoIcone("secundario")}>
+                  <ArrowUp aria-hidden="true" />
+                </button>
+                <button type="button" ref={aoMontar(alvo(l.k, "desce"))} disabled={i === linhas.length - 1} onClick={() => mover(i, 1)} aria-label={`Mover a instrução ${i + 1} para baixo`} title="Mover para baixo" className={botaoIcone("secundario")}>
+                  <ArrowDown aria-hidden="true" />
+                </button>
+                <button type="button" onClick={() => remover(i)} aria-label={`Remover a instrução ${i + 1}`} className={botao("destrutivo")}>
+                  <Trash2 aria-hidden="true" />
+                  Remover
+                </button>
               </div>
             </li>
           ))}
         </ol>
       )}
-      <button type="button" onClick={() => adicionar()} className={`${btn2} mt-3 min-h-11 ${FOCO}`}>+ Adicionar instrução</button>
+      <button type="button" onClick={() => adicionar()} className={botao("secundario", "mt-3")}>
+        <Plus aria-hidden="true" />
+        Adicionar instrução
+      </button>
       <p role="status" className="mt-1 min-h-5 text-sm text-slate-800">{aviso}</p>
     </div>
   );
