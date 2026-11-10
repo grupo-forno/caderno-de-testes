@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import AdminBar from "@/components/AdminBar";
 import { btn } from "@/components/estilos";
 import { exigirAdmin } from "@/lib/admin";
-import { sql } from "@/lib/db";
+import BancoDesatualizado from "@/components/BancoDesatualizado";
+import { sql, tabelasFaltando } from "@/lib/db";
 import { ROTULO_SITUACAO } from "@/lib/rodadas";
 import { progressoDaRodada } from "@/lib/rodadasDb";
 import { criarRodada } from "../../rodada-actions";
@@ -21,6 +22,8 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   const sp = await searchParams;
   const [cad] = await sql`select titulo from cadernos where id = ${id}`;
   if (!cad) notFound();
+  const faltando = await tabelasFaltando(["cenarios", "rodadas", "rodada_cenarios", "rodada_validadores", "rodada_atribuicoes", "respostas_atribuicao", "pendencias"]);
+  if (faltando.length) return <BancoDesatualizado cadernoId={id} pagina="As Rodadas" faltando={faltando} />;
   const rodadas = await sql`select id, nome, versao, prazo::text as prazo, situacao, publicada_em from rodadas where caderno_id = ${id} order by criado desc`;
   const progressos = await Promise.all(rodadas.map((r) => (r.situacao === "em_validacao" ? progressoDaRodada(r.id) : null)));
 

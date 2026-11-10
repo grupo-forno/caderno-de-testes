@@ -5,7 +5,8 @@ import { btn, btn2, campo } from "@/components/estilos";
 import { Confirmar } from "@/components/ui";
 import { exigirAdmin } from "@/lib/admin";
 import { contextoDoCenario, envolveTela, ROTULO_TIPO, semAcento, type Cenario } from "@/lib/cenarios";
-import { sql } from "@/lib/db";
+import BancoDesatualizado from "@/components/BancoDesatualizado";
+import { sql, tabelasFaltando } from "@/lib/db";
 import { duplicarCenario, mudarSituacaoCenario } from "../../cenario-actions";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,8 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
 
   const [cad] = await sql`select titulo from cadernos where id = ${id}`;
   if (!cad) notFound();
+  const faltando = await tabelasFaltando(["cenarios"]);
+  if (faltando.length) return <BancoDesatualizado cadernoId={id} pagina="A Biblioteca de testes" faltando={faltando} />;
   const modulos = await sql`select id, titulo from modulos where caderno_id = ${id} order by ordem`;
   const telas = await sql`select id, titulo, modulo_id from telas where caderno_id = ${id}`;
   const rows = await sql`select id, titulo, objetivo, tipo, tela_id, passos, situacao, atualizado from cenarios where caderno_id = ${id} order by atualizado desc`;
