@@ -1,3 +1,4 @@
+import { MSG_APROVADA, rodadaAprovada } from "@/lib/aceiteRodadaDb";
 import { conviteDoPedido, validadorDoConvite } from "@/lib/convite";
 import { sql } from "@/lib/db";
 import { pendentes, type CenarioSnap } from "@/lib/rodadas";
@@ -10,6 +11,8 @@ const erro = (msg: string, status: number, extra: object = {}) => Response.json(
 export async function POST(req: Request) {
   const v = await validadorDoConvite(conviteDoPedido(req)).catch(() => null);
   if (!v) return erro("Este link de acesso não vale mais. Peça um novo link a quem preparou a rodada.", 401, { codigo: "sem_permissao" });
+  const aprovada = await rodadaAprovada(v.rodadaId);
+  if (aprovada) return erro(MSG_APROVADA(aprovada), 409, { codigo: "aceito" });
   try {
     const atrib = await sql`
       select a.id, a.enviado_em, rc.snapshot from rodada_atribuicoes a join rodada_cenarios rc on rc.id = a.rodada_cenario_id

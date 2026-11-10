@@ -426,3 +426,22 @@ with novas as (
 )
 insert into pendencia_eventos (pendencia_id, tipo, autor, obs)
 select id, 'aberta', 'Sistema', 'Pendência criada a partir de um envio anterior' from novas
+
+;
+
+-- MÓDULO 5: ACEITE DA RODADA. Cada decisão e cada reabertura ficam registradas e nunca são alteradas. O retrato guarda o resumo (resultados, pendências, ressalvas) como estava na hora da decisão. O token evita decisão duplicada em clique repetido
+create table if not exists rodada_aceites (
+  id            uuid primary key default gen_random_uuid(),
+  rodada_id     uuid not null references rodadas(id) on delete cascade,
+  tipo          text not null check (tipo in ('aprovada', 'aprovada_ressalvas', 'correcoes', 'reabertura')),
+  autor         text not null,
+  justificativa text not null default '',
+  versao        text not null default '',
+  retrato       jsonb not null default '{}',
+  token         text not null,
+  criado        timestamptz not null default now(),
+  unique (rodada_id, token)
+)
+;
+
+create index if not exists rodada_aceites_rodada on rodada_aceites (rodada_id, criado)

@@ -1,3 +1,4 @@
+import { MSG_APROVADA, rodadaAprovada } from "@/lib/aceiteRodadaDb";
 import { URL_ANEXO, MAX_PRINTS } from "@/lib/anexos";
 import { conviteDoPedido, validadorDoConvite } from "@/lib/convite";
 import { sql } from "@/lib/db";
@@ -13,6 +14,9 @@ export async function PUT(req: Request) {
   if (!b || typeof b !== "object") return erro("Não entendemos o que foi enviado. Recarregue a página e tente de novo.", 400);
   const v = await validadorDoConvite(conviteDoPedido(req)).catch(() => null);
   if (!v) return erro("Este link de acesso não vale mais. Peça um novo link a quem preparou a rodada.", 401, "sem_permissao");
+
+  const aprovada = await rodadaAprovada(v.rodadaId);
+  if (aprovada) return erro(MSG_APROVADA(aprovada), 409, "aceito");
 
   const reteste = typeof b.item === "string" ? b.item : "";
   const composto = typeof b.passo === "string" ? b.passo : "";

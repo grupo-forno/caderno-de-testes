@@ -17,6 +17,7 @@ export type DadosRodada = {
   validador: { nome: string; nota: string };
   atribuicoes: { id: string; enviadoEm: string | null; cenario: CenarioSnap }[]; // ids dos passos já vêm como "<atribuição>_<passo>"
   respostas: Record<string, RespPasso>;
+  aprovada?: { em: string; mensagem: string } | null; // a rodada foi aprovada: tudo vira só leitura
   retestes?: RetesteDados[]; // pedidos de reteste desta pessoa (abertos e enviados)
   respostasReteste?: Record<string, RespPasso>; // ids no formato "<reteste>_<passo>"
 };
@@ -116,7 +117,7 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
   const { definir } = ps;
 
   useEffect(() => {
-    definir(dados.respostas);
+    definir(dados.respostas, dados.aprovada?.mensagem ?? null);
   }, [dados, definir]);
 
   const resp = ps.resp;
@@ -208,6 +209,7 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
 
   const aviso = (
     <div className="space-y-3">
+      {dados.aprovada && <p role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950"><strong>Rodada aprovada.</strong> {dados.aprovada.mensagem}</p>}
       {previa && <p role="status" className="rounded-lg border border-violet-300 bg-violet-50 px-4 py-3 text-sm text-violet-950"><strong>Prévia como validador.</strong> É assim que {dados.validador.nome} vai ver. Nada é salvo nem enviado aqui.</p>}
       {ps.bloqueio && <p role="alert" className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950"><strong>{ps.bloqueio}</strong> Recarregue a página para continuar.</p>}
       {ps.falhas > 0 && !ps.bloqueio && (
@@ -233,6 +235,7 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
           respostas={respostas}
           token={token}
           previa={previa}
+          aprovada={dados.aprovada?.mensagem ?? null}
           aoVoltar={() => setVista({ t: "inicio" })}
           aoAtualizar={(m) => setRespRt((x) => ({ ...x, ...m }))}
           aoEnviado={(id, resultado, situacao) => setRetestes((l) => l.map((x) => (x.id === id ? { ...x, status: "enviado", resultado, pendenciaSituacao: situacao, enviadoEm: new Date().toISOString() } : x)))}
@@ -342,7 +345,7 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
           {!todosEnviados && (
             <div className="mt-5 flex flex-wrap items-center gap-3">
               {!confirmando ? (
-                <button type="button" disabled={previa || idsPendentes.length > 0 || ocupado} onClick={() => setConfirmando(true)} className={`min-h-12 rounded-md bg-indigo-600 px-6 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 ${FOCO}`}>
+                <button type="button" disabled={previa || idsPendentes.length > 0 || ocupado || !!dados.aprovada} onClick={() => setConfirmando(true)} className={`min-h-12 rounded-md bg-indigo-600 px-6 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 ${FOCO}`}>
                   {ocupado ? "Aguarde: salvando…" : "Enviar meus resultados"}
                 </button>
               ) : (

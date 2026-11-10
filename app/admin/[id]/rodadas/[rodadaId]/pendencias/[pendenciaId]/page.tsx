@@ -34,6 +34,7 @@ const ERROS: Record<string, string> = {
   versao: "Informe em qual versão ou build a correção está.",
   issue: "O endereço da issue precisa começar com https:// (ou http://).",
   resolvida: "Esta pendência já está resolvida.",
+  aprovada: "A rodada está aprovada e bloqueada. Para pedir um novo reteste, reabra a rodada na aba Aceite.",
   pendencia: "Não foi possível concluir. Recarregue a página e tente de novo.",
 };
 

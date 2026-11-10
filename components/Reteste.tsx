@@ -37,11 +37,12 @@ const MENSAGEM_RESULTADO = {
 } as const;
 
 // A tela do reteste: o que foi corrigido, o que refazer, a execução (a mesma do restante) e o envio
-export default function Reteste({ reteste, respostas, token, previa, aoVoltar, aoEnviado, aoAtualizar }: {
+export default function Reteste({ reteste, respostas, token, previa, aprovada, aoVoltar, aoEnviado, aoAtualizar }: {
   reteste: RetesteDados;
   respostas: Record<string, RespPasso>;
   token?: string | null;
   previa?: boolean;
+  aprovada?: string | null; // rodada aprovada: só leitura
   aoVoltar: () => void;
   aoAtualizar?: (resp: Record<string, RespPasso>) => void; // avisa quem guarda as respostas, para não sumirem ao sair e voltar
   aoEnviado: (id: string, resultado: "resolvida" | "falhou" | "bloqueado", situacao: SituacaoPendencia) => void;
@@ -54,8 +55,8 @@ export default function Reteste({ reteste, respostas, token, previa, aoVoltar, a
   const { definir } = ps;
   const inicial = useRef(respostas);
   useEffect(() => {
-    definir(inicial.current);
-  }, [definir]);
+    definir(inicial.current, aprovada ?? null);
+  }, [definir, aprovada]);
   const { resp: respAtual } = ps;
   useEffect(() => {
     if (!previa && Object.keys(respAtual).length) aoAtualizar?.(respAtual);
@@ -216,7 +217,7 @@ export default function Reteste({ reteste, respostas, token, previa, aoVoltar, a
           {!enviado && (
             <div className="mt-5">
               {!confirmando ? (
-                <button type="button" disabled={previa || av.pendentes.length > 0 || ocupado} onClick={() => setConfirmando(true)} className={`min-h-12 rounded-md bg-indigo-600 px-6 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 ${FOCO}`}>
+                <button type="button" disabled={previa || av.pendentes.length > 0 || ocupado || !!aprovada} onClick={() => setConfirmando(true)} className={`min-h-12 rounded-md bg-indigo-600 px-6 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 ${FOCO}`}>
                   {ocupado ? "Aguarde: salvando…" : "Enviar reteste"}
                 </button>
               ) : (

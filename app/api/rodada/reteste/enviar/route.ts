@@ -1,3 +1,4 @@
+import { MSG_APROVADA, rodadaAprovada } from "@/lib/aceiteRodadaDb";
 import { conviteDoPedido, validadorDoConvite } from "@/lib/convite";
 import { sql } from "@/lib/db";
 import { avaliarReteste, situacaoAposReteste, ROTULO_PENDENCIA } from "@/lib/pendencias";
@@ -13,6 +14,8 @@ export async function POST(req: Request) {
   const reteste = typeof b?.reteste === "string" ? b.reteste : "";
   const v = await validadorDoConvite(conviteDoPedido(req)).catch(() => null);
   if (!v) return erro("Este link de acesso não vale mais. Peça um novo link a quem preparou a rodada.", 401, { codigo: "sem_permissao" });
+  const aprovada = await rodadaAprovada(v.rodadaId);
+  if (aprovada) return erro(MSG_APROVADA(aprovada), 409, { codigo: "aceito" });
   if (!/^[0-9a-f-]{36}$/i.test(reteste)) return erro("Faltam dados para enviar. Recarregue a página e tente de novo.", 400);
 
   try {

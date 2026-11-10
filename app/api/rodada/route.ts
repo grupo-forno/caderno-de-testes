@@ -1,3 +1,4 @@
+import { MSG_APROVADA, rodadaAprovada } from "@/lib/aceiteRodadaDb";
 import { sql } from "@/lib/db";
 import { conviteDoPedido, validadorDoConvite } from "@/lib/convite";
 import type { CenarioSnap } from "@/lib/rodadas";
@@ -21,6 +22,7 @@ export async function GET(req: Request) {
     const resp = await sql`
       select x.atribuicao_id, x.passo, x.resultado, x.obs, x.anexos from respostas_atribuicao x
       join rodada_atribuicoes a on a.id = x.atribuicao_id where a.validador_id = ${v.id}`;
+    const aprovada = await rodadaAprovada(v.rodadaId);
     const composto = (a: string, p: string) => `${a}_${p}`;
 
     // retestes pedidos pela equipe para esta pessoa (abertos e já enviados, para consulta), cada um com a tentativa original da falha
@@ -62,6 +64,7 @@ export async function GET(req: Request) {
           const s = a.snapshot as CenarioSnap;
           return { id: a.id, enviadoEm: a.enviado_em ? new Date(a.enviado_em).toISOString() : null, cenario: { ...s, passos: s.passos.map((p) => ({ ...p, id: composto(a.id, p.id) })) } };
         }),
+        aprovada: aprovada ? { em: aprovada.em, mensagem: MSG_APROVADA(aprovada) } : null,
         retestes,
         respostasReteste,
         respostas: Object.fromEntries(resp.map((x) => [composto(x.atribuicao_id, x.passo), { resultado: x.resultado, obs: x.obs, anexos: x.anexos }])),

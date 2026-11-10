@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { exigirAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
+import { rodadaAprovada } from "@/lib/aceiteRodadaDb";
 import { passosDoPedido } from "@/lib/pendencias";
 import type { CenarioSnap } from "@/lib/rodadas";
 
@@ -91,6 +92,7 @@ export async function solicitarReteste(cadernoId: string, rodadaId: string, pend
   if (!corrigido) redirect(`${aqui}?erro=corrigido#reteste`);
   if (!versao) redirect(`${aqui}?erro=versao#reteste`);
   if (p.situacao === "resolvida") redirect(`${aqui}?erro=resolvida`);
+  if (await rodadaAprovada(rodadaId)) redirect(`${aqui}?erro=aprovada`);
 
   const doCenario = (p.snapshot as CenarioSnap).passos.map((x) => x.id);
   if (!doCenario.includes(p.passo)) redirect(`${aqui}?erro=pendencia`);
