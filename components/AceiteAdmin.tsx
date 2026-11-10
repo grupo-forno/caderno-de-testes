@@ -20,7 +20,7 @@ export default async function AceiteAdmin({ cadernoId, slug, erro, reaberta }: {
   const antigos = aceites.filter((a) => a.reaberto_em);
 
   return (
-    <section aria-labelledby="titulo-homologacao" className={`mt-6 rounded-lg border p-5 ${vigente ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"}`}>
+    <section aria-labelledby="titulo-homologacao" className={`rounded-lg border p-5 ${vigente ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"}`}>
       <h2 id="titulo-homologacao" className="font-semibold">Aceite da homologação</h2>
       {reaberta && <p role="status" className="mt-2 rounded-md bg-white px-3 py-2 text-sm text-emerald-900">Homologação reaberta. O cliente já pode mudar as respostas de novo.</p>}
       {erro && ERROS[erro] && <p role="alert" className="mt-2 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">{ERROS[erro]}</p>}

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import AbasRodada from "@/components/AbasRodada";
-import AdminBar from "@/components/AdminBar";
 import { btn, btn2, campo } from "@/components/estilos";
 import { Confirmar } from "@/components/ui";
 import { exigirAdmin } from "@/lib/admin";
@@ -81,7 +80,6 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
 
   return (
     <>
-      <AdminBar />
       <main className="mx-auto max-w-4xl px-4 py-8">
         <Link href={`${base}/pendencias`} className="text-sm text-indigo-800 hover:underline">← Pendências da rodada</Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">

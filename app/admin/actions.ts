@@ -2,7 +2,7 @@
 
 import { randomBytes, randomUUID } from "node:crypto";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
 import { juntarInstrucoes, semDuplicados, separarInstrucoes } from "@/lib/listas";
@@ -71,12 +71,12 @@ export async function criarCaderno(f: FormData) {
 export async function salvarCaderno(id: string, f: FormData) {
   await exigirAdmin();
   const titulo = txt(f, "titulo");
-  if (!titulo) redirect(`/admin/${id}?erro=titulo`);
+  if (!titulo) redirect(`/admin/${id}/editar?erro=titulo`);
   // endereço do ambiente de teste: opcional, só http(s)
   const ambiente = opc(f, "ambiente_url");
-  if (ambiente && !/^https?:$/.test((() => { try { return new URL(ambiente).protocol; } catch { return ""; } })())) redirect(`/admin/${id}?erro=ambiente`);
+  if (ambiente && !/^https?:$/.test((() => { try { return new URL(ambiente).protocol; } catch { return ""; } })())) redirect(`/admin/${id}/editar?erro=ambiente`);
   await sql`update cadernos set titulo = ${titulo}, versao = ${txt(f, "versao") || "1.0"}, preparado_por = ${txt(f, "preparado_por")}, antes = ${juntarInstrucoes(separarInstrucoes(txt(f, "antes")))}, ambiente_url = ${ambiente}, atualizado = now() where id = ${id}`;
-  redirect(`/admin/${id}?salvo=1`);
+  redirect(`/admin/${id}/editar?salvo=1`);
 }
 
 export async function excluirCaderno(id: string) {
@@ -104,22 +104,22 @@ export async function criarModulos(cadernoId: string, f: FormData) {
   await exigirAdmin();
   await naoSeConcluido(cadernoId);
   const pedidos = linhas(f, "titulos");
-  if (!pedidos.length) redirect(`/admin/${cadernoId}?erro=modulos`);
+  if (!pedidos.length) redirect(`/admin/${cadernoId}/estrutura?erro=modulos`);
   // não repete nome (nem o de um módulo que já existe no caderno): o que sobrar é criado e o resto é informado
   const existentes = (await sql`select titulo from modulos where caderno_id = ${cadernoId}`).map((m) => m.titulo as string);
   const { novos: titulos, ignorados } = semDuplicados(pedidos, existentes);
-  if (!titulos.length) redirect(`/admin/${cadernoId}?erro=modulos_repetidos${avisoIgnorados(ignorados)}`);
+  if (!titulos.length) redirect(`/admin/${cadernoId}/estrutura?erro=modulos_repetidos${avisoIgnorados(ignorados)}`);
   const [{ n }] = await sql`select coalesce(max(ordem), 0)::int as n from modulos where caderno_id = ${cadernoId}`;
   await sql.transaction(titulos.map((t, i) => sql`insert into modulos (caderno_id, ordem, titulo) values (${cadernoId}, ${n + i + 1}, ${t})`));
-  redirect(`/admin/${cadernoId}?salvo=1${avisoIgnorados(ignorados)}`);
+  redirect(`/admin/${cadernoId}/estrutura?salvo=1${avisoIgnorados(ignorados)}`);
 }
 
 export async function renomearModulo(cadernoId: string, moduloId: string, f: FormData) {
   await exigirAdmin();
   const titulo = txt(f, "titulo");
-  if (!titulo) redirect(`/admin/${cadernoId}?erro=modulo_nome`);
+  if (!titulo) redirect(`/admin/${cadernoId}/estrutura?erro=modulo_nome`);
   await sql`update modulos set titulo = ${titulo} where id = ${moduloId} and caderno_id = ${cadernoId}`;
-  redirect(`/admin/${cadernoId}?salvo=1`);
+  redirect(`/admin/${cadernoId}/estrutura?salvo=1`);
 }
 
 export async function moverModulo(cadernoId: string, moduloId: string, dir: -1 | 1) {
@@ -129,7 +129,7 @@ export async function moverModulo(cadernoId: string, moduloId: string, dir: -1 |
   const j = i + dir;
   if (i < 0 || j < 0 || j >= m.length) return;
   await sql`update modulos set ordem = case id when ${m[i].id}::uuid then ${m[j].ordem}::int else ${m[i].ordem}::int end where id in (${m[i].id}, ${m[j].id})`;
-  revalidatePath(`/admin/${cadernoId}`);
+  revalidatePath(`/admin/${cadernoId}/estrutura`);
 }
 
 export async function excluirModulo(cadernoId: string, moduloId: string) {
@@ -145,7 +145,7 @@ export async function excluirModulo(cadernoId: string, moduloId: string) {
       sql`delete from modulos where id = ${moduloId} and caderno_id = ${cadernoId}`, // apaga junto as telas
     ]);
   }
-  redirect(`/admin/${cadernoId}?salvo=1`);
+  redirect(`/admin/${cadernoId}/estrutura?salvo=1`);
 }
 
 // ---------- telas ----------
@@ -155,22 +155,37 @@ export async function criarTelasEmLote(cadernoId: string, moduloId: string, f: F
   await exigirAdmin();
   await naoSeConcluido(cadernoId);
   const titulos = linhas(f, "titulos");
-  if (!titulos.length) redirect(`/admin/${cadernoId}?erro=telas`);
+  if (!titulos.length) redirect(`/admin/${cadernoId}/estrutura?erro=telas`);
   const [m] = await sql`select 1 from modulos where id = ${moduloId} and caderno_id = ${cadernoId}`;
-  if (!m) redirect(`/admin/${cadernoId}?erro=modulo`);
+  if (!m) redirect(`/admin/${cadernoId}/estrutura?erro=modulo`);
   const [{ n }] = await sql`select coalesce(max(ordem), 0)::int as n from telas where caderno_id = ${cadernoId}`;
   await sql.transaction(titulos.map((t, i) => sql`insert into telas (caderno_id, modulo_id, ordem, titulo, itens) values (${cadernoId}, ${moduloId}, ${n + i + 1}, ${t}, '[]'::jsonb)`));
-  redirect(`/admin/${cadernoId}?salvo=1`);
+  redirect(`/admin/${cadernoId}/estrutura?salvo=1`);
 }
 
-export async function salvarTela(cadernoId: string, telaId: string | null, f: FormData) {
+// Resultado do salvamento do editor: em vez de redirecionar (e perder o que foi digitado), devolve o erro para o formulário mostrar junto do campo
+export type EstadoTela = { erro?: string | null } | null;
+
+// Erro inesperado (banco fora do ar, por exemplo) também volta como resultado: o formulário continua preenchido e oferece tentar de novo
+export async function salvarTela(cadernoId: string, telaId: string | null, volta: string, anterior: EstadoTela, f: FormData): Promise<EstadoTela> {
+  try {
+    return await salvarTelaInterno(cadernoId, telaId, volta, anterior, f);
+  } catch (e) {
+    unstable_rethrow(e); // redirecionamentos e "não encontrado" do Next passam
+    console.error("salvarTela", e);
+    return { erro: "falha" };
+  }
+}
+
+async function salvarTelaInterno(cadernoId: string, telaId: string | null, volta: string, _anterior: EstadoTela, f: FormData): Promise<EstadoTela> {
   await exigirAdmin();
-  await naoSeConcluido(cadernoId);
+  const [cad] = await sql`select slug from cadernos where id::text = ${cadernoId}`;
+  if (cad && (await aceiteVigente(cad.slug))) return { erro: "travado" };
   const titulo = txt(f, "titulo");
-  if (!titulo) redirect(`/admin/${cadernoId}/tela/${telaId ?? "nova"}?erro=titulo`);
+  if (!titulo) return { erro: "titulo" };
   if (telaId) {
     const [existe] = await sql`select 1 from telas where id = ${telaId} and caderno_id = ${cadernoId}`;
-    if (!existe) redirect(`/admin/${cadernoId}?erro=tela`);
+    if (!existe) redirect(`/admin/${cadernoId}/estrutura?erro=tela`);
   }
   const nomes = f.getAll("itemNome").map(String);
   const fazs = f.getAll("itemFaz").map(String);
@@ -193,26 +208,26 @@ export async function salvarTela(cadernoId: string, telaId: string | null, f: Fo
       };
     })
     .filter((i) => i.nome);
-  if (roteiroInvalido) redirect(`/admin/${cadernoId}/tela/${telaId ?? "nova"}?erro=passo`);
+  if (roteiroInvalido) return { erro: "passo" };
 
   // Pop-up: a tela pai tem que ser uma tela principal do mesmo caderno, e uma tela que já tem pop-ups não pode virar pop-up.
   // O pop-up sempre fica no módulo da tela pai. Tela principal escolhe o módulo.
   const paiId = opc(f, "pai_id");
   let moduloId: string | null = null;
   if (paiId) {
-    const [pai] = await sql`select modulo_id from telas where id::text = ${paiId} and caderno_id = ${cadernoId} and pai_id is null and id::text <> ${telaId ?? ""}`;
+    const [pai] = ehUuid(paiId) ? await sql`select modulo_id from telas where id::text = ${paiId} and caderno_id = ${cadernoId} and pai_id is null and id::text <> ${telaId ?? ""}` : [];
     const [filhos] = telaId ? await sql`select 1 from telas where pai_id = ${telaId} limit 1` : [];
-    if (!pai || filhos) redirect(`/admin/${cadernoId}/tela/${telaId ?? "nova"}?erro=pai`);
+    if (!pai || filhos) return { erro: "pai" };
     moduloId = pai.modulo_id;
   } else {
     const escolhido = opc(f, "modulo_id");
-    const [m] = escolhido ? await sql`select 1 from modulos where id::text = ${escolhido} and caderno_id = ${cadernoId}` : [];
-    if (!m) redirect(`/admin/${cadernoId}/tela/${telaId ?? "nova"}?erro=modulo`);
+    const [m] = escolhido && ehUuid(escolhido) ? await sql`select 1 from modulos where id::text = ${escolhido} and caderno_id = ${cadernoId}` : [];
+    if (!m) return { erro: "modulo" };
     moduloId = escolhido;
   }
 
   // links e arquivos só podem ser endereços seguros: nada de javascript: nem endereços internos
-  const link = opc(f, "link_url");
+  const link = paiId ? null : opc(f, "link_url");
   const imagem = opc(f, "imagem_url");
   const pdf = opc(f, "pdf_url");
   const urlDe = (v: string | null, soBlob: boolean) => {
@@ -225,29 +240,40 @@ export async function salvarTela(cadernoId: string, telaId: string | null, f: Fo
       return false;
     }
   };
-  if (!urlDe(link, false) || !urlDe(imagem, true) || !urlDe(pdf, true) || !itens.every((i) => urlDe(i.imagem ?? null, true))) {
-    redirect(`/admin/${cadernoId}/tela/${telaId ?? "nova"}?erro=url`);
-  }
+  if (!urlDe(link, false) || !urlDe(imagem, true) || !urlDe(pdf, true) || !itens.every((i) => urlDe(i.imagem ?? null, true))) return { erro: "url" };
+  // como o validador chega até a tela (só tela principal): modo do teste e caminho no menu
+  const caminho = paiId ? "" : txt(f, "caminho_menu").slice(0, 200);
+  const modoPedido = txt(f, "modo");
+  const modo = paiId ? null : modoPedido === "desenho" || modoPedido === "funcional" ? modoPedido : link ? "funcional" : "desenho";
   const dados = { titulo, imagem, link, pdf, itens: JSON.stringify(itens) };
-  if (telaId) {
-    const feito = await sql`update telas set titulo = ${dados.titulo}, imagem_url = ${dados.imagem}, link_url = ${dados.link}, pdf_url = ${dados.pdf}, itens = ${dados.itens}::jsonb, pai_id = ${paiId}::uuid, modulo_id = ${moduloId}::uuid where id = ${telaId} and caderno_id = ${cadernoId} returning id`;
-    if (!feito.length) redirect(`/admin/${cadernoId}?erro=tela`); // a tela foi excluída enquanto você editava
-    // os pop-ups acompanham a tela quando ela muda de módulo
-    await sql`update telas set modulo_id = ${moduloId}::uuid where pai_id = ${telaId}`;
-  } else {
-    await sql`
-      insert into telas (caderno_id, modulo_id, ordem, titulo, imagem_url, link_url, pdf_url, itens, pai_id)
-      values (${cadernoId}, ${moduloId}::uuid, (select coalesce(max(ordem), 0) + 1 from telas where caderno_id = ${cadernoId}), ${dados.titulo}, ${dados.imagem}, ${dados.link}, ${dados.pdf}, ${dados.itens}::jsonb, ${paiId}::uuid)`;
+  let idFinal = telaId;
+  try {
+    if (telaId) {
+      const feito = await sql`update telas set titulo = ${dados.titulo}, imagem_url = ${dados.imagem}, link_url = ${dados.link}, pdf_url = ${dados.pdf}, itens = ${dados.itens}::jsonb, pai_id = ${paiId}::uuid, modulo_id = ${moduloId}::uuid, caminho_menu = ${caminho}, modo_teste = ${modo} where id = ${telaId} and caderno_id = ${cadernoId} returning id`;
+      if (!feito.length) redirect(`/admin/${cadernoId}/estrutura?erro=tela`); // a tela foi excluída enquanto você editava
+      // os pop-ups acompanham a tela quando ela muda de módulo
+      await sql`update telas set modulo_id = ${moduloId}::uuid where pai_id = ${telaId}`;
+    } else {
+      const [nova] = await sql`
+        insert into telas (caderno_id, modulo_id, ordem, titulo, imagem_url, link_url, pdf_url, itens, pai_id, caminho_menu, modo_teste)
+        values (${cadernoId}, ${moduloId}::uuid, (select coalesce(max(ordem), 0) + 1 from telas where caderno_id = ${cadernoId}), ${dados.titulo}, ${dados.imagem}, ${dados.link}, ${dados.pdf}, ${dados.itens}::jsonb, ${paiId}::uuid, ${caminho}, ${modo})
+        returning id`;
+      idFinal = nova.id as string;
+    }
+  } catch (e) {
+    // coluna nova ainda não existe neste banco: a atualização do banco (npm run db:setup) está pendente
+    if ((e as { code?: string })?.code === "42703") return { erro: "banco" };
+    throw e;
   }
   await sql`update cadernos set atualizado = now() where id = ${cadernoId}`;
-  redirect(`/admin/${cadernoId}?salvo=1`);
+  redirect(`/admin/${cadernoId}/tela/${idFinal}?salvo=${Date.now().toString(36)}${telaId ? "" : "&criada=1"}${["dados", "funcionalidades", "previa"].includes(txt(f, "aba")) ? `&aba=${txt(f, "aba")}` : ""}${volta ? `&volta=${encodeURIComponent(volta)}` : ""}`);
 }
 
 export async function excluirTela(cadernoId: string, telaId: string) {
   await exigirAdmin();
   await naoSeConcluido(cadernoId);
   await sql`delete from telas where id = ${telaId} and caderno_id = ${cadernoId}`;
-  revalidatePath(`/admin/${cadernoId}`);
+  revalidatePath(`/admin/${cadernoId}/estrutura`);
 }
 
 // Sobe ou desce a tela entre as irmãs (mesmo módulo e mesma tela pai)
@@ -263,7 +289,7 @@ export async function moverTela(cadernoId: string, telaId: string, dir: -1 | 1) 
   const j = i + dir;
   if (i < 0 || j < 0 || j >= t.length) return;
   await sql`update telas set ordem = case id when ${t[i].id}::uuid then ${t[j].ordem}::int else ${t[i].ordem}::int end where id in (${t[i].id}, ${t[j].id})`;
-  revalidatePath(`/admin/${cadernoId}`);
+  revalidatePath(`/admin/${cadernoId}/estrutura`);
 }
 
 // ---------- correção (auditada) ----------

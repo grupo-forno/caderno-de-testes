@@ -445,3 +445,20 @@ create table if not exists rodada_aceites (
 ;
 
 create index if not exists rodada_aceites_rodada on rodada_aceites (rodada_id, criado)
+
+;
+
+-- REDESIGN DA TELA: como o validador chega até a tela. O caminho no menu (Compras, Pedidos, Novo pedido) e o modo do teste ficam guardados na tela. Sem modo gravado, vale o que sempre valeu: com link é teste funcional, sem link é revisão de desenho
+alter table telas add column if not exists caminho_menu text not null default ''
+
+;
+
+alter table telas add column if not exists modo_teste text
+
+;
+
+alter table telas drop constraint if exists telas_modo_teste_check
+
+;
+
+alter table telas add constraint telas_modo_teste_check check (modo_teste is null or modo_teste in ('funcional', 'desenho'))

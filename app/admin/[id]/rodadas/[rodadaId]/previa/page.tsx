@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import AdminBar from "@/components/AdminBar";
 import { MeusTestes, type DadosRodada } from "@/components/MeusTestes";
 import { exigirAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
@@ -52,7 +51,6 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
 
   return (
     <>
-      <AdminBar />
       <div className="mx-auto max-w-5xl px-4 pt-4">
         <Link href={`/admin/${id}/rodadas/${rodadaId}`} className="text-sm text-indigo-800 hover:underline">← Voltar à rodada</Link>
       </div>

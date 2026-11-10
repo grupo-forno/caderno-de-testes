@@ -25,7 +25,7 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
       <main className="mx-auto max-w-sm px-4 py-16">
         <h1 className="text-xl font-semibold">Área de quem monta os cadernos</h1>
         <form action={entrar} className="mt-5 space-y-4 rounded-lg border border-slate-200 bg-white p-5">
-          <Campo rotulo="Senha" nome="senha" type="password" obrigatorio autoFocus />
+          <Campo rotulo="Senha" nome="senha" type="password" autoComplete="current-password" obrigatorio autoFocus />
           {erro === "espere" ? (
             <Aviso tom="erro">Muitas tentativas seguidas. Espere 15 minutos e tente de novo.</Aviso>
           ) : erro ? (

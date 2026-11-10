@@ -122,5 +122,5 @@ export async function confirmarImportacao(cadernoId: string, _anterior: EstadoIm
     console.error("confirmarImportacao", e);
     return erroGeral(texto, "Não conseguimos gravar a planilha agora, e nada foi alterado. Clique em Verificar planilha e tente importar de novo. Se continuar, avise quem cuida do sistema.");
   }
-  redirect(`/admin/${cadernoId}?importado=1`);
+  redirect(`/admin/${cadernoId}/estrutura?importado=1`);
 }

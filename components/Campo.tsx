@@ -11,7 +11,7 @@ export default function Campo({ rotulo, nome, ajuda, erro, obrigatorio, ...resto
         {rotulo} {obrigatorio && <span className="font-normal text-slate-600">(obrigatório)</span>}
       </label>
       {ajuda && <p id={`${id}-ajuda`} className="mt-0.5 text-xs text-slate-700">{ajuda}</p>}
-      <input id={id} name={nome} required={obrigatorio} aria-invalid={erro ? true : undefined} aria-describedby={descritoPor} className={`${campo} min-h-11 sm:min-h-10 ${erro ? "border-rose-600" : ""}`} {...resto} />
+      <input id={id} name={nome} required={obrigatorio} aria-invalid={erro ? true : undefined} aria-describedby={descritoPor} autoComplete="off" className={`${campo} min-h-11 sm:min-h-10 ${erro ? "border-rose-600" : ""}`} {...resto} />
       {erro && <p id={`${id}-erro`} role="alert" className="mt-1 text-sm text-rose-800">{erro}</p>}
     </div>
   );

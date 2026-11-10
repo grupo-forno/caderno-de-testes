@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import Imagem from "@/components/Imagem";
 import LinkTela from "@/components/LinkTela";
+import { acessoDaTela } from "@/lib/acesso";
 import { estadoPasso, passoCompleto, ROTULO_PASSO, RESULTADOS_PASSO, type EstadoPasso } from "@/lib/passos";
 import { ROTULO_SEVERIDADE, SEVERIDADES, type Item, type Modulo, type Passo, type RespPasso, type ResultadoPasso, type Severidade, type Tela } from "@/lib/tipos";
 
@@ -23,6 +24,7 @@ export type PassoFila = {
   numeroModulo: string;
   perfil?: string; // perfil de acesso que executa este passo (cenários de rodada)
   perfilAnterior?: string | null; // perfil do passo anterior, para avisar a troca
+  paiTitulo?: string | null; // quando a tela é um pop-up: a tela em que ele abre
 };
 
 export const idPasso = (id: string) => `p:${id}`;
@@ -89,9 +91,11 @@ type Props = {
   gravidade?: Record<string, Severidade>; // gravidade da falha de cada funcionalidade (só no caderno; as rodadas não usam)
   aoGravidade?: (itemId: string, sev: Severidade) => void;
   erroGravidade?: string | null;
+  ambienteUrl?: string | null; // endereço do ambiente de homologação do caderno (para telas que se abrem pelo menu)
+  previa?: boolean; // prévia interna de quem prepara o teste: só leitura, nada é gravado
 };
 
-export default function Execucao({ atual, fila, posicao, resp, chave, slug, somenteLeitura, payloadUpload, rotuloItem = "Funcionalidade", semLinkTela, salvamento, aoMudar, aoIr, aoSair, gravidade, aoGravidade, erroGravidade }: Props) {
+export default function Execucao({ atual, fila, posicao, resp, chave, slug, somenteLeitura, payloadUpload, rotuloItem = "Funcionalidade", semLinkTela, salvamento, aoMudar, aoIr, aoSair, gravidade, aoGravidade, erroGravidade, ambienteUrl, previa }: Props) {
   const { passo, item, tela, modulo } = atual;
   const r = resp[passo.id];
   const estado = estadoPasso(r);
@@ -100,6 +104,7 @@ export default function Execucao({ atual, fila, posicao, resp, chave, slug, some
   const [okAnexo, setOkAnexo] = useState("");
   const campoTexto = useRef<HTMLTextAreaElement>(null);
   const imagem = item.imagem ?? tela.imagem;
+  const acesso = acessoDaTela(tela, ambienteUrl ?? null, atual.paiTitulo);
 
   // passos da mesma funcionalidade (para pular entre eles)
   const irmaos = fila.filter((f) => f.item.id === item.id);
@@ -202,16 +207,28 @@ export default function Execucao({ atual, fila, posicao, resp, chave, slug, some
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        {tela.link ? (
+        {acesso.tipo === "link" && (
           <>
             <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900 ring-1 ring-inset ring-emerald-300">Tela programada: teste de verdade</span>
-            <a href={tela.link} target="_blank" rel="noreferrer" className={`inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>
+            <a href={acesso.url} target="_blank" rel="noreferrer" className={`inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>
               Abrir a tela para testar<span className="sr-only"> (abre em nova aba)</span>
             </a>
           </>
-        ) : (
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800 ring-1 ring-inset ring-slate-300">Só desenho: confira pela imagem, não há tela para abrir</span>
         )}
+        {acesso.tipo === "menu" && (
+          <>
+            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900 ring-1 ring-inset ring-emerald-300">Teste de verdade: abra pelo menu</span>
+            {acesso.url && (
+              <a href={acesso.url} target="_blank" rel="noreferrer" className={`inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>
+                Abrir o ambiente de teste<span className="sr-only"> (abre em nova aba)</span>
+              </a>
+            )}
+            <p className="basis-full text-sm text-slate-800"><span className="font-semibold">Caminho no menu:</span> {acesso.caminho}</p>
+          </>
+        )}
+        {acesso.tipo === "desenho" && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800 ring-1 ring-inset ring-slate-300">Só desenho: confira pela imagem, não há tela para abrir</span>}
+        {acesso.tipo === "pop-up" && <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-950 ring-1 ring-inset ring-violet-300">Pop-up de “{atual.paiTitulo}”: abre dentro dessa tela, como o passo explica</span>}
+        {acesso.tipo === "incompleto" && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-950 ring-1 ring-inset ring-amber-400">Quem preparou ainda não explicou como abrir esta tela. Avise a equipe.</span>}
         {tela.pdf && (
           <a href={tela.pdf} target="_blank" rel="noreferrer" className={`inline-flex min-h-11 items-center rounded-md border border-slate-400 bg-white px-4 text-sm font-medium hover:bg-slate-50 ${FOCO}`}>
             Ver PDF das funcionalidades<span className="sr-only"> (abre em nova aba)</span>
@@ -280,7 +297,23 @@ export default function Execucao({ atual, fila, posicao, resp, chave, slug, some
             <div role="status"><ChipEstado estado={estado} /></div>
           </div>
 
-          {somenteLeitura ? (
+          {previa ? (
+            <div className="mt-3 text-sm">
+              <p className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900">Prévia interna: é aqui que o validador responde. Nada digitado ou escolhido é gravado.</p>
+              <ul className="mt-3 space-y-2" aria-label="Opções de resposta do validador">
+                {RESULTADOS_PASSO.map((v) => (
+                  <li key={v} className="flex items-start gap-3 rounded-md border border-slate-300 bg-white px-3 py-2 opacity-80">
+                    <span className="mt-0.5 text-slate-800"><Icone estado={v === "funcionou" ? "funcionou" : v === "diferente" ? "diferente" : "bloqueado"} /></span>
+                    <span>
+                      <span className="block text-sm font-semibold">{ROTULO_PASSO[v]}</span>
+                      <span className="block text-xs text-slate-700">{DICA[v]}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-slate-700">Quem testa também escreve o que aconteceu, anexa prints como evidência e informa a gravidade quando algo deu diferente.</p>
+            </div>
+          ) : somenteLeitura ? (
             <div className="mt-3 text-sm">
               <p><span className="font-semibold">Resultado:</span> {r ? ROTULO_PASSO[r.resultado] : "Sem resposta"}</p>
               {r?.obs && <p className="mt-1 whitespace-pre-wrap"><span className="font-semibold">Texto:</span> {r.obs}</p>}
@@ -387,12 +420,12 @@ export default function Execucao({ atual, fila, posicao, resp, chave, slug, some
             <span aria-hidden="true">← </span>Passo anterior
           </LinkTela>
         ) : <span />}
-        <button type="button" onClick={aoSair} className={`min-h-11 rounded-md px-3 text-sm font-medium text-indigo-800 underline ${FOCO}`}>Sair do teste (o que você fez fica salvo)</button>
+        {!previa && <button type="button" onClick={aoSair} className={`min-h-11 rounded-md px-3 text-sm font-medium text-indigo-800 underline ${FOCO}`}>Sair do teste (o que você fez fica salvo)</button>}
         {proximo ? (
           <LinkTela id={idPasso(proximo.passo.id)} aoIr={aoIr} className={`inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>
             {proximo.item.id === item.id ? "Próximo passo" : `Próximo ${rotuloItem.toLowerCase()}`}<span aria-hidden="true"> →</span>
           </LinkTela>
-        ) : (
+        ) : previa ? <span /> : (
           <button type="button" onClick={aoSair} className={`min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>Terminar e ver o resumo</button>
         )}
       </nav>

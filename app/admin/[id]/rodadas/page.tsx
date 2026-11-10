@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import AdminBar from "@/components/AdminBar";
 import { btn } from "@/components/estilos";
 import { exigirAdmin } from "@/lib/admin";
 import BancoDesatualizado from "@/components/BancoDesatualizado";
@@ -29,7 +28,6 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
 
   return (
     <>
-      <AdminBar />
       <main className="mx-auto max-w-4xl px-4 py-8">
         <Link href={`/admin/${id}`} className="text-sm text-indigo-800 hover:underline">← {cad.titulo}</Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">

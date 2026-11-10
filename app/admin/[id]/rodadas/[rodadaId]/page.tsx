@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import AbasRodada from "@/components/AbasRodada";
-import AdminBar from "@/components/AdminBar";
 import { btn, btn2, campo } from "@/components/estilos";
 import SelecaoCenarios from "@/components/SelecaoCenarios";
 import { Confirmar, CopiarLink } from "@/components/ui";
@@ -71,7 +70,6 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
     for (const x of a.atribuicoes) nAtrib[x.prog.estado]++;
     return (
       <>
-        <AdminBar />
         <main className="mx-auto max-w-4xl px-4 py-8">
           {topo}
           <AbasRodada cadernoId={id} rodadaId={rodadaId} ativa="geral" abertas={(await sql`select count(*)::int as n from pendencias where rodada_id = ${rodadaId} and situacao <> 'resolvida'`)[0].n} />
@@ -262,7 +260,6 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
 
   return (
     <>
-      <AdminBar />
       <main className="mx-auto max-w-4xl px-4 py-8">
         {topo}
         <p className="mt-3 text-sm text-slate-700">Esta rodada é um rascunho: nada foi enviado aos validadores. Preencha os três blocos e publique.</p>

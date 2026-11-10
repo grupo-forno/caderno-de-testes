@@ -6,7 +6,8 @@ import { MoreHorizontal } from "lucide-react";
 import { botaoIcone, FOCO } from "@/components/estilos";
 
 // o ícone vem como elemento (<History />), não como componente: uma página de servidor não pode passar funções a um componente de cliente
-type Item = { rotulo: string; href: string; icone?: ReactNode };
+// Uma opção é navegação (href) ou uma ação do servidor (acao), com confirmação opcional e destaque para as que apagam
+type Item = { rotulo: string; icone?: ReactNode; perigo?: boolean; desabilitada?: boolean } & ({ href: string; acao?: never; confirmar?: never } | { href?: never; acao: () => void | Promise<void>; confirmar?: string });
 
 // Menu de ações secundárias de uma linha da lista. O botão tem nome acessível e dica; as opções são links de navegação.
 // Teclado: Enter ou Espaço abre, setas movem, Esc fecha e devolve o foco ao botão, Tab sai.
@@ -68,14 +69,33 @@ export default function MenuAcoes({ rotulo, itens }: { rotulo: string; itens: It
       </button>
       {aberto && (
         <ul id={id} role="menu" aria-label={rotulo} className="absolute right-0 top-full z-20 mt-1 min-w-56 rounded-md border border-slate-300 bg-white p-1 shadow-lg">
-          {itens.map(({ rotulo: r, href, icone }) => (
-            <li key={href} role="none">
-              <Link role="menuitem" tabIndex={-1} href={href} onClick={() => setAberto(false)} className={`flex min-h-11 items-center gap-2 rounded px-3 text-sm text-slate-900 hover:bg-slate-100 focus-visible:bg-slate-100 sm:min-h-10 ${FOCO}`}>
-                <span aria-hidden="true" className="text-slate-600 [&>svg]:size-4 [&>svg]:shrink-0">{icone}</span>
-                {r}
-              </Link>
-            </li>
-          ))}
+          {itens.map((it) => {
+            const cor = it.perigo ? "text-rose-800 hover:bg-rose-50 focus-visible:bg-rose-50" : "text-slate-900 hover:bg-slate-100 focus-visible:bg-slate-100";
+            const classe = `flex min-h-11 w-full items-center gap-2 rounded px-3 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-10 ${cor} ${FOCO}`;
+            const conteudo = (
+              <>
+                <span aria-hidden="true" className="[&>svg]:size-4 [&>svg]:shrink-0">{it.icone}</span>
+                {it.rotulo}
+              </>
+            );
+            return (
+              <li key={it.rotulo} role="none">
+                {it.href !== undefined ? (
+                  <Link role="menuitem" tabIndex={-1} href={it.href} onClick={() => setAberto(false)} className={classe}>{conteudo}</Link>
+                ) : (
+                  <form
+                    action={it.acao}
+                    onSubmit={(e) => {
+                      if (it.confirmar && !confirm(it.confirmar)) return e.preventDefault();
+                      setTimeout(() => setAberto(false), 0);
+                    }}
+                  >
+                    <button type="submit" role="menuitem" tabIndex={-1} disabled={it.desabilitada} className={classe}>{conteudo}</button>
+                  </form>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

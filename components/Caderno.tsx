@@ -113,7 +113,7 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
     if (!modulo) continue;
     for (const item of tela.itens) {
       if (!temRoteiro(item)) continue;
-      item.passos.forEach((passo, n) => fila.push({ passo, indice: n + 1, total: item.passos.length, item, tela, numeroTela: numero, modulo, numeroModulo: numeros[modulo.id] }));
+      item.passos.forEach((passo, n) => fila.push({ passo, indice: n + 1, total: item.passos.length, item, tela, numeroTela: numero, modulo, numeroModulo: numeros[modulo.id], paiTitulo: tela.paiId ? caderno.telas.find((x) => x.id === tela.paiId)?.titulo ?? null : null }));
     }
   }
   const posPasso = ativa.startsWith("p:") ? fila.findIndex((f) => idPasso(f.passo.id) === ativa) : -1;
@@ -797,6 +797,7 @@ export default function Caderno({ caderno, slug }: { caderno: C; slug: string })
                 gravidade={ps.gravidade}
                 aoGravidade={ps.informarGravidade}
                 erroGravidade={ps.erroGravidade}
+                ambienteUrl={caderno.ambienteUrl}
                 aoIr={ir}
                 aoSair={() => ir(posPasso === fila.length - 1 ? "resumo" : "inicio")} // no último passo o botão é "Terminar e ver o resumo"
               />

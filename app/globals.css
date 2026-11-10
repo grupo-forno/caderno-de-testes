@@ -7,6 +7,7 @@ body {
 /* a barra fixa do celular não pode cobrir o campo que recebe o foco */
 html {
   scroll-padding-top: 5.5rem;
+  scroll-padding-bottom: 5rem; /* a barra de salvar fixa embaixo não cobre o campo que recebe o foco */
 }
 
 /* sem o atraso de toque no celular */

@@ -36,6 +36,8 @@ export type Tela = {
   pdf: string | null;
   itens: Item[]; // sem itens = tela ainda em preparação
   paiId: string | null; // preenchido quando é um pop-up ou parte de outra tela
+  caminho?: string; // caminho no menu até a tela, por exemplo Compras → Pedidos → Novo pedido
+  modo?: "funcional" | "desenho"; // sem valor: com link é teste funcional, sem link é revisão de desenho
 };
 
 // O caderno é o sistema inteiro: módulos, e dentro deles as telas

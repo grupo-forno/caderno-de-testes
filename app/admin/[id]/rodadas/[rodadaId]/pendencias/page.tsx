@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import AbasRodada from "@/components/AbasRodada";
-import AdminBar from "@/components/AdminBar";
 import { btn2, campo } from "@/components/estilos";
 import { exigirAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
@@ -44,7 +43,6 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
 
   return (
     <>
-      <AdminBar />
       <main className="mx-auto max-w-4xl px-4 py-8">
         <Link href={`/admin/${id}/rodadas`} className="text-sm text-indigo-800 hover:underline">← Rodadas</Link>
         <h1 className="mt-2 text-2xl font-semibold">{r.nome} <span className="text-base font-normal text-slate-700">versão {r.versao}</span></h1>

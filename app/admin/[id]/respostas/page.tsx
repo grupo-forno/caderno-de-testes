@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import AdminBar from "@/components/AdminBar";
 import { exigirAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
 import NovoLink from "@/components/NovoLink";
@@ -47,7 +46,6 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
 
   return (
     <>
-      <AdminBar />
       <main className="mx-auto max-w-4xl px-4 py-8">
         <Link href={`/admin/${id}`} className="text-sm text-indigo-800 hover:underline">← Voltar ao caderno</Link>
         <h1 className="mt-2 text-2xl font-semibold">Respostas: {c.titulo}</h1>

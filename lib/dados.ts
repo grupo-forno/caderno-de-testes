@@ -25,6 +25,8 @@ export async function buscarCaderno(slug: string): Promise<{ id: string; caderno
         pdf: t.pdf_url ?? (t.itens.length ? `/api/pdf/${t.id}` : null),
         itens: t.itens,
         paiId: t.pai_id,
+        caminho: t.caminho_menu ?? "",
+        modo: t.modo_teste ?? undefined,
       })),
     },
   };

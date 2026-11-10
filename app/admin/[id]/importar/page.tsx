@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import AdminBar from "@/components/AdminBar";
 import ImportarForm from "@/components/ImportarForm";
 import { btn2 } from "@/components/estilos";
 import { exigirAdmin } from "@/lib/admin";
@@ -16,7 +15,6 @@ export default async function Page({ params }: PageProps<"/admin/[id]/importar">
 
   return (
     <>
-      <AdminBar />
       <main className="mx-auto max-w-3xl px-4 py-8">
         <Link href={`/admin/${id}`} className="text-sm text-indigo-800 hover:underline">← Voltar ao caderno</Link>
         <h1 className="mt-2 text-2xl font-semibold">Importar de uma planilha</h1>

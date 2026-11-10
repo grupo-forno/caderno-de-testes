@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import AdminBar from "@/components/AdminBar";
 import CenarioForm, { type InicialCenario } from "@/components/CenarioForm";
 import { exigirAdmin } from "@/lib/admin";
 import { type PassoCenario } from "@/lib/cenarios";
@@ -59,7 +58,6 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
 
   return (
     <>
-      <AdminBar />
       <main className="mx-auto max-w-3xl px-4 py-8">
         <Link href={`/admin/${id}/biblioteca`} className="text-sm text-indigo-800 hover:underline">← Biblioteca de testes</Link>
         <h1 className="mt-2 text-2xl font-semibold">{nova ? "Novo cenário" : "Editar cenário"}</h1>

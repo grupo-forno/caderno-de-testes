@@ -1,12 +1,10 @@
 import Link from "next/link";
-import AdminBar from "@/components/AdminBar";
 import { enderecoDoBanco } from "@/lib/db";
 
 // Mostrada no lugar de uma página quando o banco ainda não tem as tabelas que ela usa (atualização do banco pendente).
 export default function BancoDesatualizado({ cadernoId, pagina, faltando }: { cadernoId: string; pagina: string; faltando: string[] }) {
   return (
     <>
-      <AdminBar />
       <main className="mx-auto max-w-2xl px-4 py-10">
         <Link href={`/admin/${cadernoId}`} className="text-sm text-indigo-800 hover:underline">← Voltar ao caderno</Link>
         <h1 className="mt-2 text-balance text-2xl font-semibold">{pagina} ainda não pode abrir neste ambiente</h1>
