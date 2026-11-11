@@ -1,5 +1,6 @@
 "use client";
 
+import { Confirmar } from "@/components/ui";
 import { useEffect, useState } from "react";
 import { btn, btn2, campo } from "@/components/estilos";
 
@@ -150,7 +151,6 @@ export function FormReabrir({ acao, chaveRascunho, limpar }: { acao: (f: FormDat
   const [token, setToken] = useState("");
   const [motivo, setMotivo] = useState("");
   const [autor, setAutor] = useState("");
-  const [enviando, setEnviando] = useState(false);
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
     setToken(typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
@@ -173,7 +173,7 @@ export function FormReabrir({ acao, chaveRascunho, limpar }: { acao: (f: FormDat
     } catch {}
   }, [motivo, autor, chaveRascunho]);
   return (
-    <form action={acao} onSubmit={(e) => { if (!confirm("Reabrir esta rodada? As respostas voltam a poder mudar e será preciso uma nova decisão. O aceite anterior continua no histórico.")) e.preventDefault(); else setEnviando(true); }} className="mt-3">
+    <form action={acao} className="mt-3">
       <input type="hidden" name="token" value={token} />
       <label className="block text-sm font-medium">Seu nome <span className="font-normal text-slate-600">(obrigatório)</span>
         <input name="autor" required value={autor} onChange={(e) => setAutor(e.target.value)} maxLength={120} className={campo + " min-h-11"} />
@@ -181,7 +181,7 @@ export function FormReabrir({ acao, chaveRascunho, limpar }: { acao: (f: FormDat
       <label className="mt-3 block text-sm font-medium">Motivo da reabertura <span className="font-normal text-slate-600">(obrigatório)</span>
         <textarea name="motivo" required minLength={5} value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3} maxLength={3000} className={campo + " field-sizing-content"} />
       </label>
-      <button disabled={enviando || !token} className={`${btn2} mt-3 min-h-11 disabled:opacity-60 ${FOCO}`}>{enviando ? "Reabrindo…" : "Reabrir rodada"}</button>
+      <Confirmar ok="Reabrir rodada" desabilitado={!token} texto="Reabrir esta rodada? As respostas voltam a poder mudar e será preciso uma nova decisão. O aceite anterior continua no histórico." className={`${btn2} mt-3 min-h-11 ${FOCO}`}>Reabrir rodada</Confirmar>
     </form>
   );
 }

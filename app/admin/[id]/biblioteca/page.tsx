@@ -140,7 +140,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                   <form action={duplicarCenario.bind(null, id, c.id)}><BotaoEnviar variante="secundario">Duplicar<span className="sr-only"> {c.titulo}</span></BotaoEnviar></form>
                   {c.situacao === "ativo" ? (
                     <form action={mudarSituacaoCenario.bind(null, id, c.id, "arquivado")}>
-                      <Confirmar texto={`Arquivar “${c.titulo}”? Ele sai da lista padrão, mas nada é apagado e dá para reativar.`} className={btn2 + " min-h-11"}>Arquivar<span className="sr-only"> {c.titulo}</span></Confirmar>
+                      <Confirmar ok="Arquivar" texto={`Arquivar “${c.titulo}”? Ele sai da lista padrão, mas nada é apagado e dá para reativar.`} className={btn2 + " min-h-11"}>Arquivar<span className="sr-only"> {c.titulo}</span></Confirmar>
                     </form>
                   ) : (
                     <form action={mudarSituacaoCenario.bind(null, id, c.id, "ativo")}><BotaoEnviar variante="secundario">Reativar<span className="sr-only"> {c.titulo}</span></BotaoEnviar></form>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import BotaoEnviar from "@/components/BotaoEnviar";
 import { btn2 } from "@/components/estilos";
+import NovaRodada from "@/components/NovaRodada";
 import { Confirmar } from "@/components/ui";
 import { exigirAdmin } from "@/lib/admin";
 import BancoDesatualizado from "@/components/BancoDesatualizado";
@@ -21,7 +21,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   const { id } = await params;
   if (!ehUuid(id)) notFound();
   const sp = await searchParams;
-  const [cad] = await sql`select titulo from cadernos where id = ${id}`;
+  const [cad] = await sql`select titulo, versao from cadernos where id = ${id}`;
   if (!cad) notFound();
   const faltando = await tabelasFaltando(["cenarios", "rodadas", "rodada_cenarios", "rodada_validadores", "rodada_atribuicoes", "respostas_atribuicao", "pendencias"]);
   if (faltando.length) return <BancoDesatualizado cadernoId={id} pagina="As Rodadas" faltando={faltando} />;
@@ -34,10 +34,11 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
         <Link href={`/admin/${id}`} className="text-sm text-indigo-800 hover:underline">← {cad.titulo}</Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold">Rodadas de homologação</h1>
-          <form action={criarRodada.bind(null, id)}><BotaoEnviar pendente="Criando…" className="min-h-11">Nova rodada</BotaoEnviar></form>
+          <NovaRodada acao={criarRodada.bind(null, id)} versao={cad.versao} />
         </div>
         <p className="mt-1 text-sm text-slate-700">Cada rodada é uma entrega: você escolhe os cenários da biblioteca, atribui aos validadores e acompanha a execução.</p>
         {sp.excluida && <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">Rodada excluída.</p>}
+        {sp.erro === "nome" && <p role="alert" className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">Escreva o nome da rodada para criá-la.</p>}
         {sp.erro === "rodada" && <p role="alert" className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">Essa rodada não existe mais. Confira a lista abaixo.</p>}
 
         {rodadas.length === 0 ? (
@@ -73,7 +74,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                     <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm text-slate-700">Ainda em preparação: nada foi enviado aos validadores.</p>
                       <form action={excluirRodada.bind(null, id, r.id)}>
-                        <Confirmar texto={`Excluir a rodada “${r.nome}”? Ela ainda não foi publicada, então nada é perdido além do rascunho. Não dá para desfazer.`} className={btn2 + " min-h-11"}>Excluir<span className="sr-only"> {r.nome}</span></Confirmar>
+                        <Confirmar ok="Excluir" perigo texto={`Excluir a rodada “${r.nome}”? Ela ainda não foi publicada, então nada é perdido além do rascunho. Não dá para desfazer.`} className={btn2 + " min-h-11"}>Excluir<span className="sr-only"> {r.nome}</span></Confirmar>
                       </form>
                     </div>
                   )}

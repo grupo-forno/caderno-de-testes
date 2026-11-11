@@ -32,18 +32,21 @@ const urlOk = (v: string) => {
   }
 };
 
-export async function criarRodada(cadernoId: string) {
+export async function criarRodada(cadernoId: string, f: FormData) {
   await exigirAdmin();
   const [c] = ehUuid(cadernoId) ? await sql`select versao, ambiente_url from cadernos where id = ${cadernoId}` : [];
   if (!c) redirect("/admin");
+  const nome = txt(f, "nome", 200);
+  if (!nome) redirect(`${base(cadernoId)}?erro=nome`);
+  const versao = txt(f, "versao", 60) || c.versao;
   // Clique repetido (a criação pode demorar): reaproveita o rascunho em branco criado há instantes em vez de fazer outro
   const [recente] = await sql`
     select r.id from rodadas r
-    where r.caderno_id = ${cadernoId} and r.situacao = 'rascunho' and r.nome = 'Nova rodada' and r.criado > now() - interval '30 seconds'
+    where r.caderno_id = ${cadernoId} and r.situacao = 'rascunho' and r.nome = ${nome} and r.criado > now() - interval '30 seconds'
       and not exists (select 1 from rodada_cenarios rc where rc.rodada_id = r.id)
     order by r.criado desc limit 1`;
   if (recente) redirect(`${base(cadernoId)}/${recente.id}`);
-  const [r] = await sql`insert into rodadas (caderno_id, nome, versao, ambiente_url) values (${cadernoId}, 'Nova rodada', ${c.versao}, ${c.ambiente_url}) returning id`;
+  const [r] = await sql`insert into rodadas (caderno_id, nome, versao, ambiente_url) values (${cadernoId}, ${nome}, ${versao}, ${c.ambiente_url}) returning id`;
   redirect(`${base(cadernoId)}/${r.id}`);
 }
 

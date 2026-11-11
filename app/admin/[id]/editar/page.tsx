@@ -57,7 +57,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
         <div className="mt-8">
           <Secao id="t-risco" titulo="Excluir caderno" descricao="Apaga o caderno inteiro, com os módulos, as telas, as respostas dos clientes e o histórico. Não dá para desfazer.">
             <form action={excluirCaderno.bind(null, id)}>
-              <Confirmar texto="Excluir este caderno inteiro, com os módulos, as telas, as respostas dos clientes e o histórico? Não dá para desfazer." className={botao("destrutivo")}>
+              <Confirmar ok="Excluir caderno" perigo texto="Excluir este caderno inteiro, com os módulos, as telas, as respostas dos clientes e o histórico? Não dá para desfazer." className={botao("destrutivo")}>
                 <Trash2 aria-hidden="true" />
                 Excluir caderno
               </Confirmar>

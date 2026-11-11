@@ -283,7 +283,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                         <BotaoEnviar variante="secundario" pendente="Renomeando…">Renomear</BotaoEnviar>
                       </form>
                       <form action={excluirModulo.bind(null, id, m.id)}>
-                        <Confirmar texto={`Excluir o módulo “${m.titulo}”, com as ${popups + principais} telas e pop-ups dele, e também as respostas e o histórico dos clientes dessas telas? Não dá para desfazer.`} className={botao("destrutivo")}>
+                        <Confirmar ok="Excluir módulo" perigo texto={`Excluir o módulo “${m.titulo}”, com as ${popups + principais} telas e pop-ups dele, e também as respostas e o histórico dos clientes dessas telas? Não dá para desfazer.`} className={botao("destrutivo")}>
                           <Trash2 aria-hidden="true" />
                           Excluir módulo e tudo dentro dele
                         </Confirmar>

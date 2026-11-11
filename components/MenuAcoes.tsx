@@ -3,7 +3,23 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { MoreHorizontal } from "lucide-react";
-import { botaoIcone, FOCO } from "@/components/estilos";
+import { useFormStatus } from "react-dom";
+import { Loader2 } from "lucide-react";
+import Dialogo from "@/components/Dialogo";
+import { botao, botaoIcone, FOCO } from "@/components/estilos";
+
+function BotoesConfirmar({ perigo, ok, aoCancelar }: { perigo?: boolean; ok: string; aoCancelar: () => void }) {
+  const { pending } = useFormStatus();
+  return (
+    <div className="mt-5 flex flex-wrap justify-end gap-2">
+      <button type="button" disabled={pending} onClick={aoCancelar} className={botao("secundario")}>Cancelar</button>
+      <button type="submit" disabled={pending} aria-busy={pending} className={botao(perigo ? "destrutivo" : "primario")}>
+        {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
+        {pending ? "Aguarde…" : ok}
+      </button>
+    </div>
+  );
+}
 
 // o ícone vem como elemento (<History />), não como componente: uma página de servidor não pode passar funções a um componente de cliente
 // Uma opção é navegação (href) ou uma ação do servidor (acao), com confirmação opcional e destaque para as que apagam
@@ -13,6 +29,7 @@ type Item = { rotulo: string; icone?: ReactNode; perigo?: boolean; desabilitada?
 // Teclado: Enter ou Espaço abre, setas movem, Esc fecha e devolve o foco ao botão, Tab sai.
 export default function MenuAcoes({ rotulo, itens }: { rotulo: string; itens: Item[] }) {
   const [aberto, setAberto] = useState(false);
+  const [confirmando, setConfirmando] = useState<Item | null>(null);
   const raiz = useRef<HTMLDivElement>(null);
   const gatilho = useRef<HTMLButtonElement>(null);
   const id = useId();
@@ -83,21 +100,27 @@ export default function MenuAcoes({ rotulo, itens }: { rotulo: string; itens: It
                 {it.href !== undefined ? (
                   <Link role="menuitem" tabIndex={-1} href={it.href} onClick={() => setAberto(false)} className={classe}>{conteudo}</Link>
                 ) : (
-                  <form
-                    action={it.acao}
-                    onSubmit={(e) => {
-                      if (it.confirmar && !confirm(it.confirmar)) return e.preventDefault();
-                      setTimeout(() => setAberto(false), 0);
-                    }}
-                  >
-                    <button type="submit" role="menuitem" tabIndex={-1} disabled={it.desabilitada} className={classe}>{conteudo}</button>
-                  </form>
+                  it.confirmar ? (
+                    <button type="button" role="menuitem" tabIndex={-1} disabled={it.desabilitada} aria-haspopup="dialog" onClick={() => { setAberto(false); setConfirmando(it); }} className={classe}>{conteudo}</button>
+                  ) : (
+                    <form action={it.acao} onSubmit={() => setTimeout(() => setAberto(false), 0)}>
+                      <button type="submit" role="menuitem" tabIndex={-1} disabled={it.desabilitada} className={classe}>{conteudo}</button>
+                    </form>
+                  )
                 )}
               </li>
             );
           })}
         </ul>
       )}
+      <Dialogo aberto={!!confirmando} aoFechar={() => setConfirmando(null)} titulo={(confirmando?.confirmar ?? "").split("?")[0] + "?"}>
+        {confirmando && (
+          <form action={confirmando.acao}>
+            <p className="text-sm text-slate-800">{(confirmando.confirmar ?? "").split("?").slice(1).join("?").trim()}</p>
+            <BotoesConfirmar perigo={confirmando.perigo} ok={confirmando.perigo ? "Excluir" : "Confirmar"} aoCancelar={() => setConfirmando(null)} />
+          </form>
+        )}
+      </Dialogo>
     </div>
   );
 }

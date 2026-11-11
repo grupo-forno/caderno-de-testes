@@ -295,7 +295,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                   <span><strong>{v.nome}</strong> · {v.email}{v.nota && <span className="block text-xs text-slate-700">Orientação: {v.nota}</span>}</span>
                   <span className="flex flex-wrap gap-2">
                     <Link href={`${aqui}/previa?validador=${v.id}`} className={btn2 + " inline-flex min-h-11 items-center"}>Prévia como {v.nome}</Link>
-                    <form action={removerValidador.bind(null, id, rodadaId, v.id)}><Confirmar texto={`Remover ${v.nome} da rodada? As atribuições dessa pessoa também saem.`} className={btn2 + " min-h-11"}>Remover<span className="sr-only"> {v.nome}</span></Confirmar></form>
+                    <form action={removerValidador.bind(null, id, rodadaId, v.id)}><Confirmar ok="Remover" perigo texto={`Remover ${v.nome} da rodada? As atribuições dessa pessoa também saem.`} className={btn2 + " min-h-11"}>Remover<span className="sr-only"> {v.nome}</span></Confirmar></form>
                   </span>
                 </li>
               ))}
@@ -360,7 +360,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             {impedem.length > 0 ? (
               <button disabled className={btn + " min-h-11 disabled:opacity-50"}>Publicar rodada</button>
             ) : (
-              <Confirmar texto="Publicar esta rodada? O roteiro será copiado e os links de acesso passam a funcionar. Depois disso a rodada não pode ser editada." className={btn + " min-h-11"}>Publicar rodada</Confirmar>
+              <Confirmar ok="Publicar" texto="Publicar esta rodada? O roteiro será copiado e os links de acesso passam a funcionar. Depois disso a rodada não pode ser editada." className={btn + " min-h-11"}>Publicar rodada</Confirmar>
             )}
           </form>
         </section>
