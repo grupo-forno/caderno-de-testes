@@ -450,12 +450,6 @@ export default function EditorTela({ cadernoId, telaId, inicial, modulos, princi
                             <p className="text-xs text-slate-700">Passo a passo para outra pessoa testar sozinha. Cada passo diz o que fazer e o que ela deve ver.</p>
                             {it.passos.length === 0 && <p className="mt-2 text-sm text-amber-950"><strong>Sem roteiro.</strong> O validador só verá a descrição e responderá OK, NÃO OK ou NÃO TESTADO.</p>}
                             <EditorPassos recolhiveis prefixo="passo" passos={it.passos} erros={errosPasso(it)} aoMudar={(lista) => mudarItem(it.k, { passos: lista })} novo={() => novoPassoEditavel()} />
-                            {it.id && it.passos.length > 0 && (
-                              <p className="mt-3 text-sm">
-                                <Link href={`/admin/${cadernoId}/biblioteca/novo?de=${it.id}`} className={botao("discreto", "-ml-3")}>Criar cenário a partir deste roteiro</Link>
-                                <span className="block text-xs text-slate-700">Abre a biblioteca com uma cópia dos passos salvos. Salve a tela antes se mexeu nos passos.</span>
-                              </p>
-                            )}
                           </fieldset>
 
                           <div className="border-t border-slate-100 pt-3">

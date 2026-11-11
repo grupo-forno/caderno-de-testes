@@ -18,7 +18,7 @@ function Navegacao({ cadernoId, nome, aoNavegar }: { cadernoId: string; nome: st
   const trabalho: Destino[] = [
     { rotulo: "Visão geral", href: base, icone: <LayoutDashboard />, ativo: p === base || em("/respostas", "/historico") },
     { rotulo: "Estrutura", href: `${base}/estrutura`, icone: <LayoutList />, ativo: em("/estrutura", "/tela", "/importar") },
-    { rotulo: "Biblioteca de testes", href: `${base}/biblioteca`, icone: <ListChecks />, ativo: em("/biblioteca") },
+    { rotulo: "Fluxos entre telas", href: `${base}/biblioteca`, icone: <ListChecks />, ativo: em("/biblioteca") },
     { rotulo: "Homologações", href: `${base}/rodadas`, icone: <ClipboardCheck />, ativo: em("/rodadas") },
   ];
   const admin: Destino[] = [{ rotulo: "Editar caderno", href: `${base}/editar`, icone: <Pencil />, ativo: em("/editar") }];

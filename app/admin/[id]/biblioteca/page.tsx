@@ -32,7 +32,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   if (faltando.length) return <BancoDesatualizado cadernoId={id} pagina="A Biblioteca de testes" faltando={faltando} />;
   const modulos = await sql`select id, titulo from modulos where caderno_id = ${id} order by ordem`;
   const telas = await sql`select id, titulo, modulo_id from telas where caderno_id = ${id}`;
-  const rows = await sql`select id, titulo, objetivo, tipo, tela_id, passos, situacao, atualizado from cenarios where caderno_id = ${id} order by atualizado desc`;
+  const rows = await sql`select id, titulo, objetivo, tipo, tela_id, passos, situacao, atualizado from cenarios where caderno_id = ${id} and coalesce(origem_item, '') not like 'roteiro:%' order by atualizado desc`;
 
   const moduloDaTela = new Map(telas.map((t) => [t.id as string, t.modulo_id as string]));
   const nomeModulo = new Map(modulos.map((m) => [m.id as string, m.titulo as string]));
@@ -58,10 +58,10 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
       <main className="mx-auto max-w-4xl px-4 py-8">
         <Link href={`/admin/${id}`} className="text-sm text-indigo-800 hover:underline">← {cad.titulo}</Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold">Biblioteca de testes</h1>
+          <h1 className="text-2xl font-semibold">Fluxos entre telas</h1>
           <Link href={`/admin/${id}/biblioteca/novo`} className={btn + " inline-flex min-h-11 items-center"}>Novo cenário</Link>
         </div>
-        <p className="mt-1 text-sm text-slate-700">Cenários de teste para reutilizar: de uma tela só ou de um fluxo que passa por módulos e perfis diferentes.</p>
+        <p className="mt-1 text-sm text-slate-700">Testes que passam por mais de uma tela, módulo ou perfil (por exemplo: escolher a área e depois cadastrar o celular). O passo a passo de uma tela só fica na própria tela, na aba Funcionalidades e testes.</p>
 
         {aviso && <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">{aviso}</p>}
         {sp.erro === "cenario" && <p role="alert" className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">Esse cenário não existe mais. Confira a lista abaixo.</p>}

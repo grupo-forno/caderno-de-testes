@@ -7,6 +7,7 @@ import { btn, btn2, campo } from "@/components/estilos";
 import SelecaoCenarios from "@/components/SelecaoCenarios";
 import { Confirmar, CopiarLink } from "@/components/ui";
 import { exigirAdmin } from "@/lib/admin";
+import { ehRoteiro, PREFIXO_ROTEIRO } from "@/lib/roteirosDb";
 import { contextoDoCenario, ROTULO_TIPO, type PassoCenario } from "@/lib/cenarios";
 import { tokenDoValidador } from "@/lib/convite";
 import { sql } from "@/lib/db";
@@ -228,10 +229,10 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
 
   // =============== RASCUNHO: preparação ===============
   const modulos = await sql`select id, titulo from modulos where caderno_id = ${id} order by ordem`;
-  const telas = await sql`select id, modulo_id from telas where caderno_id = ${id}`;
+  const telas = await sql`select id, titulo, modulo_id, itens from telas where caderno_id = ${id} order by ordem`;
   const moduloDaTela = new Map(telas.map((t) => [t.id as string, t.modulo_id as string]));
   const nomeModulo = new Map(modulos.map((m) => [m.id as string, m.titulo as string]));
-  const cens = await sql`select id, titulo, tipo, tela_id, passos, situacao from cenarios where caderno_id = ${id} order by titulo`;
+  const cens = await sql`select id, titulo, tipo, tela_id, passos, situacao, origem_item from cenarios where caderno_id = ${id} order by titulo`;
   const rcs = await sql`select id, cenario_id from rodada_cenarios where rodada_id = ${rodadaId} order by ordem, id`;
   const escolhidos = new Set(rcs.map((x) => x.cenario_id as string));
   const vals = await sql`select id, nome, email, nota from rodada_validadores where rodada_id = ${rodadaId} order by nome`;
@@ -242,7 +243,12 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
     const ctx = contextoDoCenario({ telaId: c.tela_id, passos: c.passos as PassoCenario[] }, moduloDaTela);
     return { modulos: ctx.modulos.map((m) => nomeModulo.get(m) ?? ""), perfis: ctx.perfis };
   };
-  const opcoes = cens.filter((c) => c.situacao === "ativo" || escolhidos.has(c.id)).map((c) => ({ id: c.id as string, titulo: c.titulo as string, tipo: ROTULO_TIPO[c.tipo as keyof typeof ROTULO_TIPO], passos: (c.passos as unknown[]).length, ...info(c), marcado: escolhidos.has(c.id) }));
+  // fluxos = cenários da biblioteca; roteiros = o passo a passo das funcionalidades, lido direto da tela
+  const fluxos = cens.filter((c) => !ehRoteiro(c.origem_item as string | null));
+  const marcadoRoteiro = new Set(cens.filter((c) => escolhidos.has(c.id) && ehRoteiro(c.origem_item as string | null)).map((c) => (c.origem_item as string).slice(PREFIXO_ROTEIRO.length)));
+  const opcoesRoteiro = telas.flatMap((t) => ((t.itens as { id: string; nome: string; passos?: unknown[] }[]) ?? []).filter((i) => i.passos?.length).map((i) => ({ id: `r:${i.id}`, grupo: "roteiro" as const, titulo: `${t.titulo} › ${i.nome}`, tipo: "Roteiro da tela", passos: (i.passos as unknown[]).length, modulos: [nomeModulo.get(t.modulo_id as string) ?? ""], perfis: [] as string[], marcado: marcadoRoteiro.has(i.id) })));
+  const opcoesFluxo = fluxos.filter((c) => c.situacao === "ativo" || escolhidos.has(c.id)).map((c) => ({ id: c.id as string, titulo: c.titulo as string, tipo: ROTULO_TIPO[c.tipo as keyof typeof ROTULO_TIPO], passos: (c.passos as unknown[]).length, ...info(c), marcado: escolhidos.has(c.id), grupo: "fluxo" as const }));
+  const opcoes = [...opcoesRoteiro, ...opcoesFluxo];
   const todosModulos = [...new Set(opcoes.flatMap((o) => o.modulos))].sort();
   const todosPerfis = [...new Set(opcoes.flatMap((o) => o.perfis))].sort();
   const cenarioDoRc = new Map(rcs.map((x) => [x.id as string, cens.find((c) => c.id === x.cenario_id)]));
@@ -280,8 +286,8 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
         </section>
 
         <section id="secao-cenarios" aria-labelledby="t-cen" className={secao}>
-          <h2 id="t-cen" className="text-lg font-semibold">2. Cenários</h2>
-          <p className="mt-1 text-sm text-slate-700">Escolha da <Link href={`/admin/${id}/biblioteca`} className="text-indigo-800 underline">Biblioteca de testes</Link> os cenários desta entrega. Cenários arquivados não aparecem para escolha.</p>
+          <h2 id="t-cen" className="text-lg font-semibold">2. O que será testado</h2>
+          <p className="mt-1 text-sm text-slate-700">Escolha os <strong>roteiros das telas</strong> (o passo a passo de cada funcionalidade, que você edita na própria tela) e, se houver, os <Link href={`/admin/${id}/biblioteca`} className="text-indigo-800 underline">fluxos entre telas</Link>. O roteiro é lido da tela no momento de publicar.</p>
           <SelecaoCenarios acao={salvarCenariosDaRodada.bind(null, id, rodadaId)} cenarios={opcoes} modulos={todosModulos} perfis={todosPerfis} />
         </section>
 

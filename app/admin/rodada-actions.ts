@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { exigirAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
+import { PREFIXO_ROTEIRO, sincronizarRoteiros } from "@/lib/roteirosDb";
 import { montarSnapshot, conferirPublicacao, type TelaSnap } from "@/lib/rodadas";
 
 const ehUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
@@ -84,7 +85,10 @@ export async function salvarDadosRodada(cadernoId: string, rodadaId: string, f: 
 export async function salvarCenariosDaRodada(cadernoId: string, rodadaId: string, f: FormData) {
   await exigirAdmin();
   await rascunhoDe(cadernoId, rodadaId);
-  const quer = f.getAll("cenario").map(String).filter(ehUuid);
+  const marcados = f.getAll("cenario").map(String);
+  // "r:<id>" = roteiro de uma funcionalidade da tela: cria ou atualiza o cenário vinculado a partir da tela
+  const doRoteiro = await sincronizarRoteiros(cadernoId, marcados.filter((v) => v.startsWith("r:") && ehUuid(v.slice(2))).map((v) => v.slice(2)));
+  const quer = [...marcados.filter(ehUuid), ...doRoteiro.values()];
   const validos = await sql`select id from cenarios where caderno_id = ${cadernoId}`;
   const permitidos = new Set(validos.map((c) => c.id as string));
   const escolhidos = [...new Set(quer.filter((id) => permitidos.has(id)))];
@@ -149,6 +153,9 @@ export async function publicarRodada(cadernoId: string, rodadaId: string) {
   const aqui = `${base(cadernoId)}/${rodadaId}`;
   if (r.situacao === "em_validacao") redirect(`${aqui}?publicada=1`);
 
+  // roteiros das telas: refaz a partir do que está na tela agora, para a cópia desta publicação ser a atual
+  const vinc = await sql`select c.origem_item from rodada_cenarios rc join cenarios c on c.id = rc.cenario_id where rc.rodada_id = ${rodadaId} and c.origem_item like ${PREFIXO_ROTEIRO + "%"}`;
+  await sincronizarRoteiros(cadernoId, vinc.map((v) => (v.origem_item as string).slice(PREFIXO_ROTEIRO.length)));
   const rcs = await sql`
     select rc.id, rc.cenario_id, c.titulo, c.objetivo, c.tipo, c.pre_requisitos, c.dados_teste, c.tela_id, c.passos, c.situacao as sit,
       (select count(*)::int from rodada_atribuicoes a where a.rodada_cenario_id = rc.id) as atribuidos

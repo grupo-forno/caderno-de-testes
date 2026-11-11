@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// Dentro de um caderno (/admin/<id>/...) mostra o caminho para a Biblioteca de testes dele
+// Dentro de um caderno (/admin/<id>/...) mostra o caminho para a Fluxos entre telas dele
 export default function AdminNav() {
   const id = usePathname().match(/^\/admin\/([0-9a-f-]{36})/i)?.[1];
   if (!id) return null;
