@@ -62,18 +62,3 @@ export const ROTULO_SEVERIDADE: Record<Severidade, string> = {
 };
 export const SEVERIDADES = Object.keys(ROTULO_SEVERIDADE) as Severidade[];
 
-// Resposta de uma pessoa a uma funcionalidade
-export type Resp = { resultado: Resultado; obs: string; anexos: string[]; severidade: Severidade | null };
-
-// Um registro do histórico (auditoria): só se acrescenta, nunca se apaga
-export type Evento = {
-  tipo: "resultado" | "observacao" | "correcao";
-  ator: "cliente" | "autora";
-  nome: string;
-  de: string | null;
-  para: string | null;
-  obs: string;
-  anexos: string[];
-  severidade: Severidade | null;
-  criado: string; // data e hora em formato ISO
-};

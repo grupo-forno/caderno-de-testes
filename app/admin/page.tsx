@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { AlertTriangle, BookOpen, CheckCircle2, CircleDashed, ClipboardList, History, LogIn, MessageSquareText, Plus } from "lucide-react";
+import { BookOpen, ClipboardList, LogIn, Plus } from "lucide-react";
 import AdminBar from "@/components/AdminBar";
 import Aviso from "@/components/Aviso";
 import BotaoEnviar from "@/components/BotaoEnviar";
 import CabecalhoPagina from "@/components/CabecalhoPagina";
 import Campo from "@/components/Campo";
 import EstadoVazio from "@/components/EstadoVazio";
-import Etiqueta from "@/components/Etiqueta";
 import MenuAcoes from "@/components/MenuAcoes";
 import { botao } from "@/components/estilos";
 import { ehAdmin } from "@/lib/admin";
@@ -44,11 +43,7 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
     select c.id, c.titulo, c.versao, c.atualizado,
       (select count(*) from modulos m where m.caderno_id = c.id)::int as modulos,
       (select count(*) from telas t where t.caderno_id = c.id)::int as telas,
-      (select coalesce(sum(jsonb_array_length(t.itens)), 0) from telas t where t.caderno_id = c.id)::int as funcionalidades,
-      (select count(distinct r.item) from respostas_item r
-         where r.caderno = c.slug and r.resultado = 'nao_ok'
-           and r.item in (select e->>'id' from telas t, jsonb_array_elements(t.itens) e where t.caderno_id = c.id))::int as nao_ok,
-      (select count(distinct r.email) from respostas_item r where r.caderno = c.slug)::int as pessoas
+      (select coalesce(sum(jsonb_array_length(t.itens)), 0) from telas t where t.caderno_id = c.id)::int as funcionalidades
     from cadernos c order by c.atualizado desc`;
 
   const novo = (
@@ -80,20 +75,11 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {c.nao_ok > 0 ? (
-                    <Etiqueta tom="erro" icone={AlertTriangle}>{c.nao_ok} NÃO OK para corrigir</Etiqueta>
-                  ) : c.pessoas > 0 ? (
-                    <Etiqueta tom="sucesso" icone={CheckCircle2}>Sem NÃO OK · {plural(c.pessoas, "pessoa respondeu", "pessoas responderam")}</Etiqueta>
-                  ) : (
-                    <Etiqueta icone={CircleDashed}>Ninguém respondeu ainda</Etiqueta>
-                  )}
                   <MenuAcoes
                     rotulo={`Mais ações do caderno ${c.titulo}`}
                     itens={[
-                      { rotulo: "Ver respostas", href: `/admin/${c.id}/respostas`, icone: <MessageSquareText /> },
-                      { rotulo: "Ver histórico", href: `/admin/${c.id}/historico`, icone: <History /> },
                       { rotulo: "Rodadas de homologação", href: `/admin/${c.id}/rodadas`, icone: <ClipboardList /> },
-                      { rotulo: "Biblioteca de testes", href: `/admin/${c.id}/biblioteca`, icone: <BookOpen /> },
+                      { rotulo: "Fluxos entre telas", href: `/admin/${c.id}/biblioteca`, icone: <BookOpen /> },
                     ]}
                   />
                 </div>

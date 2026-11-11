@@ -5,18 +5,10 @@ import { headers } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
-import { juntarInstrucoes, semDuplicados, separarInstrucoes } from "@/lib/listas";
+import { semDuplicados } from "@/lib/listas";
 import { lerPassos } from "@/lib/passos";
 import type { Item } from "@/lib/tipos";
-import { hashDaChave, novaChave } from "@/lib/validador";
-import { aceiteVigente } from "@/lib/aceite";
 import { exigirAdmin, marcarEntrada, sairDoAdmin, senhaCorreta } from "@/lib/admin";
-
-// Com a homologação concluída, o que foi aprovado não pode mudar de baixo do termo: reabra antes.
-async function naoSeConcluido(cadernoId: string) {
-  const [c] = await sql`select slug from cadernos where id::text = ${cadernoId}`;
-  if (c && (await aceiteVigente(c.slug))) redirect(`/admin/${cadernoId}?erro=travado`);
-}
 
 const txt = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const opc = (f: FormData, k: string) => txt(f, k) || null;
@@ -59,8 +51,8 @@ export async function criarCaderno(f: FormData) {
   const titulo = txt(f, "titulo");
   if (!titulo) redirect("/admin/novo?erro=titulo");
   const [c] = await sql`
-    insert into cadernos (slug, titulo, versao, preparado_por, antes)
-    values (${gerarSlug(titulo)}, ${titulo}, ${txt(f, "versao") || "1.0"}, ${txt(f, "preparado_por")}, ${juntarInstrucoes(separarInstrucoes(txt(f, "antes")))})
+    insert into cadernos (slug, titulo, versao, preparado_por)
+    values (${gerarSlug(titulo)}, ${titulo}, ${txt(f, "versao") || "1.0"}, ${txt(f, "preparado_por")})
     returning id`;
   // módulos já cadastrados na criação (opcional): um por linha, sem repetir nome
   const { novos: mods, ignorados } = semDuplicados(linhas(f, "modulos"));
@@ -75,13 +67,12 @@ export async function salvarCaderno(id: string, f: FormData) {
   // endereço do ambiente de teste: opcional, só http(s)
   const ambiente = opc(f, "ambiente_url");
   if (ambiente && !/^https?:$/.test((() => { try { return new URL(ambiente).protocol; } catch { return ""; } })())) redirect(`/admin/${id}/editar?erro=ambiente`);
-  await sql`update cadernos set titulo = ${titulo}, versao = ${txt(f, "versao") || "1.0"}, preparado_por = ${txt(f, "preparado_por")}, antes = ${juntarInstrucoes(separarInstrucoes(txt(f, "antes")))}, ambiente_url = ${ambiente}, atualizado = now() where id = ${id}`;
+  await sql`update cadernos set titulo = ${titulo}, versao = ${txt(f, "versao") || "1.0"}, preparado_por = ${txt(f, "preparado_por")}, ambiente_url = ${ambiente}, atualizado = now() where id = ${id}`;
   redirect(`/admin/${id}/editar?salvo=1`);
 }
 
 export async function excluirCaderno(id: string) {
   await exigirAdmin();
-  await naoSeConcluido(id);
   const [c] = await sql`select slug from cadernos where id = ${id}`;
   if (c) {
     // tudo ou nada: não sobram respostas (com e-mails de clientes) nem histórico de um caderno que já não existe
@@ -102,7 +93,6 @@ export async function excluirCaderno(id: string) {
 
 export async function criarModulos(cadernoId: string, f: FormData) {
   await exigirAdmin();
-  await naoSeConcluido(cadernoId);
   const pedidos = linhas(f, "titulos");
   if (!pedidos.length) redirect(`/admin/${cadernoId}/estrutura?erro=modulos`);
   // não repete nome (nem o de um módulo que já existe no caderno): o que sobrar é criado e o resto é informado
@@ -134,7 +124,6 @@ export async function moverModulo(cadernoId: string, moduloId: string, dir: -1 |
 
 export async function excluirModulo(cadernoId: string, moduloId: string) {
   await exigirAdmin();
-  await naoSeConcluido(cadernoId);
   const [c] = await sql`select slug from cadernos where id = ${cadernoId}`;
   if (c) {
     // apaga as telas do módulo (e pop-ups), as respostas e o histórico das funcionalidades delas. Tudo ou nada.
@@ -153,7 +142,6 @@ export async function excluirModulo(cadernoId: string, moduloId: string) {
 // Cria várias telas só com o título (ficam "Em preparação" até a autora cadastrar as funcionalidades)
 export async function criarTelasEmLote(cadernoId: string, moduloId: string, f: FormData) {
   await exigirAdmin();
-  await naoSeConcluido(cadernoId);
   const titulos = linhas(f, "titulos");
   if (!titulos.length) redirect(`/admin/${cadernoId}/estrutura?erro=telas`);
   const [m] = await sql`select 1 from modulos where id = ${moduloId} and caderno_id = ${cadernoId}`;
@@ -179,8 +167,6 @@ export async function salvarTela(cadernoId: string, telaId: string | null, volta
 
 async function salvarTelaInterno(cadernoId: string, telaId: string | null, volta: string, _anterior: EstadoTela, f: FormData): Promise<EstadoTela> {
   await exigirAdmin();
-  const [cad] = await sql`select slug from cadernos where id::text = ${cadernoId}`;
-  if (cad && (await aceiteVigente(cad.slug))) return { erro: "travado" };
   const titulo = txt(f, "titulo");
   if (!titulo) return { erro: "titulo" };
   if (telaId) {
@@ -271,7 +257,6 @@ async function salvarTelaInterno(cadernoId: string, telaId: string | null, volta
 
 export async function excluirTela(cadernoId: string, telaId: string) {
   await exigirAdmin();
-  await naoSeConcluido(cadernoId);
   await sql`delete from telas where id = ${telaId} and caderno_id = ${cadernoId}`;
   revalidatePath(`/admin/${cadernoId}/estrutura`);
 }
@@ -290,32 +275,4 @@ export async function moverTela(cadernoId: string, telaId: string, dir: -1 | 1) 
   if (i < 0 || j < 0 || j >= t.length) return;
   await sql`update telas set ordem = case id when ${t[i].id}::uuid then ${t[j].ordem}::int else ${t[i].ordem}::int end where id in (${t[i].id}, ${t[j].id})`;
   revalidatePath(`/admin/${cadernoId}/estrutura`);
-}
-
-// ---------- correção (auditada) ----------
-
-// Quem monta o caderno avisa que ajustou uma funcionalidade que estava NÃO OK. Fica no histórico e o cliente vê "corrigido, teste de novo".
-export async function marcarCorrigido(cadernoId: string, itemId: string, f: FormData) {
-  await exigirAdmin();
-  const [t] = await sql`
-    select t.id, c.slug from telas t join cadernos c on c.id = t.caderno_id
-    where t.caderno_id = ${cadernoId} and t.itens @> jsonb_build_array(jsonb_build_object('id', ${itemId}::text))`;
-  if (!t) redirect(`/admin/${cadernoId}?erro=item`);
-  await sql`
-    insert into historico (caderno, tela, item, ator, nome, tipo, para, obs)
-    values (${t.slug}, ${t.id}, ${itemId}, 'autora', 'Equipe', 'correcao', 'corrigido', ${txt(f, "nota").slice(0, 2000)})`;
-  revalidatePath(`/admin/${cadernoId}`);
-}
-
-// ---------- quem valida ----------
-
-// Gera um novo link para continuar (a chave antiga deixa de valer). Para quem perdeu o link ou usou o e-mail de outra pessoa.
-export async function novoLinkDeValidador(cadernoId: string, email: string) {
-  await exigirAdmin();
-  const [c] = await sql`select slug from cadernos where id = ${cadernoId}`;
-  if (!c) redirect(`/admin?erro=caderno`);
-  const chave = novaChave();
-  const feito = await sql`update validadores set token_hash = ${hashDaChave(chave)} where caderno = ${c.slug} and email = ${email} returning email`;
-  if (!feito.length) redirect(`/admin/${cadernoId}/respostas?erro=validador`);
-  redirect(`/admin/${cadernoId}/respostas?novo=${encodeURIComponent(email)}#k=${chave}`);
 }

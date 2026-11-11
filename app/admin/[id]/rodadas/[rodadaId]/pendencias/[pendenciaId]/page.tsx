@@ -2,7 +2,7 @@ import Link from "next/link";
 import BotaoEnviar from "@/components/BotaoEnviar";
 import { notFound } from "next/navigation";
 import AbasRodada from "@/components/AbasRodada";
-import { btn, btn2, campo } from "@/components/estilos";
+import { btn, campo } from "@/components/estilos";
 import { Confirmar } from "@/components/ui";
 import { exigirAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";

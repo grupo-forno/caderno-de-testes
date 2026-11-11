@@ -13,10 +13,8 @@ import { Confirmar } from "@/components/ui";
 import { exigirAdmin } from "@/lib/admin";
 import { acessoDaTela, modoDaTela } from "@/lib/acesso";
 import { semAcento } from "@/lib/cenarios";
-import { consolidado } from "@/lib/consolidado";
 import { sql } from "@/lib/db";
-import { resumoTela } from "@/lib/status";
-import type { Resultado, Tela } from "@/lib/tipos";
+import type { Tela } from "@/lib/tipos";
 import { criarModulos, criarTelasEmLote, excluirModulo, excluirTela, moverModulo, moverTela, renomearModulo } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -40,10 +38,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   if (!c) notFound();
   const modulos = await sql`select id, titulo from modulos where caderno_id = ${id} order by ordem`;
   const rows = await sql`select * from telas where caderno_id = ${id} order by ordem`;
-  const resultados = await consolidado(c.slug);
-  const resultado = (itemId: string): Resultado => resultados[itemId] ?? "nao_testado";
   const telas: Tela[] = rows.map((x) => ({ id: x.id, moduloId: x.modulo_id, titulo: x.titulo, imagem: x.imagem_url, link: x.link_url, pdf: x.pdf_url, itens: x.itens, paiId: x.pai_id, caminho: x.caminho_menu ?? "", modo: x.modo_teste ?? undefined }));
-  const resumos = Object.fromEntries(telas.map((t) => [t.id, resumoTela(t, resultado)]));
 
   const q = um(sp.q).trim();
   const fModulo = modulos.some((m) => m.id === um(sp.modulo)) ? um(sp.modulo) : "";
@@ -186,21 +181,19 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                   </div>
                 ) : (
                   <>
-                    <div aria-hidden="true" className="hidden grid-cols-[minmax(0,2.4fr)_minmax(0,1.4fr)_minmax(0,1.2fr)_auto] gap-4 border-b border-slate-100 px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-600 md:grid">
+                    <div aria-hidden="true" className="hidden grid-cols-[minmax(0,2.4fr)_minmax(0,1.6fr)_auto] gap-4 border-b border-slate-100 px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-600 md:grid">
                       <span>Tela</span>
                       <span>Funcionalidades e testes</span>
-                      <span>Resultados</span>
                       <span className="w-[8.5rem]" />
                     </div>
                     <ul className="divide-y divide-slate-100">
                       {linhas.map(({ t, nivel, pos, total, filhos, pai }) => {
-                        const r = resumos[t.id];
-                        const semRoteiro = t.itens.filter((i) => !i.passos?.length).length;
+                                        const semRoteiro = t.itens.filter((i) => !i.passos?.length).length;
                         const passos = t.itens.reduce((s, i) => s + (i.passos?.length ?? 0), 0);
                         const acesso = acessoDaTela(t, c.ambiente_url, pai || null);
                         const editar = `${base}/tela/${t.id}${comVolta()}`;
                         return (
-                          <li key={t.id} className="grid items-center gap-x-4 gap-y-1 px-4 py-2.5 md:grid-cols-[minmax(0,2.4fr)_minmax(0,1.4fr)_minmax(0,1.2fr)_auto]">
+                          <li key={t.id} className="grid items-center gap-x-4 gap-y-1 px-4 py-2.5 md:grid-cols-[minmax(0,2.4fr)_minmax(0,1.6fr)_auto]">
                             <div className={`min-w-0 ${nivel ? "pl-5" : ""}`}>
                               <p className="flex items-start gap-1.5 break-words font-medium">
                                 {nivel > 0 && <CornerDownRight aria-hidden="true" className="mt-1 size-4 shrink-0 text-slate-500" />}
@@ -221,11 +214,6 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                                 <Etiqueta tom="sucesso" icone={CheckCircle2}>Roteiro completo</Etiqueta>
                               )}
                               <span className="text-xs text-slate-700">{plural(t.itens.length, "funcionalidade", "funcionalidades")} · {plural(passos, "passo", "passos")}</span>
-                            </div>
-                            <div className="text-sm text-slate-800">
-                              {r.total === 0 ? <span className="text-slate-600">—</span> : (
-                                <span className="tabular-nums">{r.ok} de {r.total} OK{r.naoOk > 0 && <strong className="text-rose-800"> · {r.naoOk} NÃO OK</strong>}</span>
-                              )}
                             </div>
                             <div className="flex items-center gap-2 md:justify-end">
                               <Link href={editar} className={botao("secundario")}>

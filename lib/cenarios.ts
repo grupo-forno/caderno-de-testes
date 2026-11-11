@@ -39,9 +39,6 @@ export function lerPassosCenario(json: string, telasValidas: Set<string>, novoId
   });
 }
 
-// Tela de um passo: a dele, ou a principal do cenário
-export const telaDoPasso = (c: Pick<Cenario, "telaId">, p: PassoCenario) => p.telaId ?? c.telaId;
-
 // Módulos (ids, na ordem em que aparecem) e perfis (nomes, sem repetir) que o cenário atravessa
 export function contextoDoCenario(c: Pick<Cenario, "telaId" | "passos">, moduloDaTela: Map<string, string>): { modulos: string[]; perfis: string[] } {
   const modulos = new Set<string>();

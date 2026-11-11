@@ -41,8 +41,6 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   if (!r) notFound();
   const base = `/admin/${id}/rodadas/${rodadaId}`;
   const ref = (x: Ref | null) => (!x ? null : x.tipo === "pendencia" ? `${base}/pendencias/${x.id}` : `${base}/previa?validador=${x.id}`);
-  const [cad] = await sql`select slug from cadernos where id = ${id}`;
-  const legados = await sql`select token, nome, criado, reaberto_em from aceites where caderno = ${cad.slug} order by criado desc`;
   const erro = typeof sp.erro === "string" ? ERROS[sp.erro] : null;
 
   if (r.situacao !== "em_validacao") {
@@ -208,14 +206,6 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                 );
               })}
             </ol>
-          )}
-          {legados.length > 0 && (
-            <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
-              <h3 className="font-semibold">Aceite legado deste caderno (modelo antigo)</h3>
-              <p className="text-xs text-slate-600">Feito pelo cliente no caderno original, antes das rodadas. Continua consultável.</p>
-              <ul className="mt-2 space-y-1">{legados.map((l) => <li key={l.token}>{l.nome} · {dataHoraBR(l.criado)}{l.reaberto_em ? " · reaberto depois" : ""} · <a href={`/api/aceite/${l.token}/pdf`} target="_blank" rel="noreferrer" className="text-indigo-800 underline">Termo (PDF)<span className="sr-only"> (abre em nova aba)</span></a></li>)}</ul>
-              <Link href={`/admin/${id}`} className="mt-1 inline-block text-indigo-800 underline">Abrir o caderno</Link>
-            </div>
           )}
         </section>
       </main>

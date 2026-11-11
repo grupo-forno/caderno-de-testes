@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { exigirAdmin } from "@/lib/admin";
 import { parseCsv } from "@/lib/csv";
-import { aceiteVigente } from "@/lib/aceite";
 import { sql } from "@/lib/db";
 import { chaveDe, ESTADO_INICIAL, planejar, semNovidade, type EstadoImportacao, type Existente, type Plano } from "@/lib/importacao";
 
@@ -74,9 +73,6 @@ export async function confirmarImportacao(cadernoId: string, _anterior: EstadoIm
   await exigirAdmin();
   const { texto, plano, existente, erro } = await prepararSeguro(cadernoId, f);
   if (erro || !plano || !existente) return erro!;
-  // com a homologação concluída o caderno não pode crescer por baixo do termo: reabra antes
-  const [cad] = await sql`select slug from cadernos where id = ${cadernoId}`;
-  if (cad && (await aceiteVigente(cad.slug))) return erroGeral(texto, "A homologação está concluída, então nada foi importado. Reabra a homologação na página do caderno e importe de novo.");
   if (plano.totalErros) return comErros(texto, plano);
   if (semNovidade(plano.resumo)) return erroGeral(texto, "Não há nada novo para importar: tudo o que está na planilha já existe neste caderno.");
 

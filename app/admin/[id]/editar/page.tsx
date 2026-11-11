@@ -5,13 +5,11 @@ import Aviso from "@/components/Aviso";
 import BotaoEnviar from "@/components/BotaoEnviar";
 import CabecalhoPagina from "@/components/CabecalhoPagina";
 import Campo from "@/components/Campo";
-import ListaInstrucoes from "@/components/ListaInstrucoes";
 import Secao from "@/components/Secao";
 import { botao } from "@/components/estilos";
 import { Confirmar } from "@/components/ui";
 import { exigirAdmin } from "@/lib/admin";
 import { sql } from "@/lib/db";
-import { separarInstrucoes } from "@/lib/listas";
 import { excluirCaderno, salvarCaderno } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -42,10 +40,6 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
 
           <Secao id="t-ambiente" titulo="Ambiente de homologação" opcional descricao="O validador vê o botão “Abrir ambiente de teste” logo na entrada do caderno, e as telas usam este endereço junto com o caminho no menu.">
             <Campo rotulo="Endereço do ambiente" nome="ambiente_url" type="url" defaultValue={c.ambiente_url ?? ""} placeholder="https://" erro={erro === "ambiente" ? "O endereço precisa começar com https:// (ou http://). Confira e salve de novo." : null} />
-          </Secao>
-
-          <Secao id="t-antes" titulo="Antes de começar" opcional>
-            <ListaInstrucoes campo="antes" inicial={separarInstrucoes(String(c.antes ?? ""))} />
           </Secao>
 
           <div className="flex flex-wrap gap-3">

@@ -4,7 +4,6 @@ import AdminBar from "@/components/AdminBar";
 import BotaoEnviar from "@/components/BotaoEnviar";
 import CabecalhoPagina from "@/components/CabecalhoPagina";
 import Campo from "@/components/Campo";
-import ListaInstrucoes from "@/components/ListaInstrucoes";
 import ListaModulos from "@/components/ListaModulos";
 import Secao from "@/components/Secao";
 import { botao } from "@/components/estilos";
@@ -40,10 +39,6 @@ export default async function Page({ searchParams }: PageProps<"/admin/novo">) {
 
           <Secao id="t-modulos" titulo="Módulos" opcional descricao="Cada módulo é uma área do sistema. Você pode adicionar mais, renomear e reordenar depois.">
             <ListaModulos campo="modulos" />
-          </Secao>
-
-          <Secao id="t-antes" titulo="Antes de começar" opcional>
-            <ListaInstrucoes campo="antes" inicial={[]} />
           </Secao>
 
           <div className="flex flex-wrap gap-3">

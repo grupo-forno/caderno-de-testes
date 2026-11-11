@@ -16,7 +16,7 @@ function Navegacao({ cadernoId, nome, aoNavegar }: { cadernoId: string; nome: st
   const base = `/admin/${cadernoId}`;
   const em = (...prefixos: string[]) => prefixos.some((x) => p.startsWith(`${base}${x}`));
   const trabalho: Destino[] = [
-    { rotulo: "Visão geral", href: base, icone: <LayoutDashboard />, ativo: p === base || em("/respostas", "/historico") },
+    { rotulo: "Visão geral", href: base, icone: <LayoutDashboard />, ativo: p === base },
     { rotulo: "Estrutura", href: `${base}/estrutura`, icone: <LayoutList />, ativo: em("/estrutura", "/tela", "/importar") },
     { rotulo: "Fluxos entre telas", href: `${base}/biblioteca`, icone: <ListChecks />, ativo: em("/biblioteca") },
     { rotulo: "Homologações", href: `${base}/rodadas`, icone: <ClipboardCheck />, ativo: em("/rodadas") },

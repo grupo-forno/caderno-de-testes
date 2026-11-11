@@ -3,7 +3,7 @@
 import BotaoEnviar from "@/components/BotaoEnviar";
 import { useId, useState } from "react";
 import EditorPassos, { novoPassoEditavel, type PassoEditavel } from "@/components/EditorPassos";
-import { btn, campo } from "@/components/estilos";
+import { campo } from "@/components/estilos";
 import { MAX_PERFIL, ROTULO_TIPO, TIPOS, type PassoCenario, type TipoCenario } from "@/lib/cenarios";
 
 type PassoLocal = PassoEditavel & { telaId: string | null; perfil: string };
