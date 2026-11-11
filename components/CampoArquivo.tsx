@@ -79,12 +79,12 @@ export default function CampoArquivo({ nome, rotulo, ajuda, tipo = "imagem", lim
         onDragOver={(e) => { e.preventDefault(); setArrastando(true); }}
         onDragLeave={() => setArrastando(false)}
         onDrop={(e) => { e.preventDefault(); setArrastando(false); if (e.dataTransfer.files?.[0]) void enviar(e.dataTransfer.files[0]); }}
-        className={`mt-2 rounded-lg border border-dashed p-3 ${arrastando ? "border-indigo-600 bg-indigo-50" : "border-slate-300 bg-slate-50"}`}
+        className={`mt-2 rounded-lg border border-dashed p-3 ${arrastando ? "border-brand-600 bg-brand-50" : "border-slate-300 bg-slate-50"}`}
       >
         {valor ? (
           <div className="flex flex-wrap items-start gap-4">
             {tipo === "imagem" ? (
-              <button type="button" onClick={() => setAmpliada(true)} aria-label={`Ampliar ${descricaoAlt ?? "a imagem"}`} title="Ampliar" className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+              <button type="button" onClick={() => setAmpliada(true)} aria-label={`Ampliar ${descricaoAlt ?? "a imagem"}`} title="Ampliar" className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={valor} alt={descricaoAlt ?? "Imagem de referência"} className="h-32 w-48 rounded-md border border-slate-200 bg-white object-contain" />
               </button>
@@ -134,7 +134,7 @@ export default function CampoArquivo({ nome, rotulo, ajuda, tipo = "imagem", lim
         {enviando && (
           <div className="mt-3" role="status">
             <p className="text-xs text-slate-800">Enviando “{enviando.arquivo}”… {enviando.pct}%</p>
-            <progress value={enviando.pct} max={100} className="mt-1 h-2 w-full overflow-hidden rounded-full accent-indigo-600" aria-label="Progresso do envio" />
+            <progress value={enviando.pct} max={100} className="mt-1 h-2 w-full overflow-hidden rounded-full accent-brand-600" aria-label="Progresso do envio" />
           </div>
         )}
         {erro && <p role="alert" className="mt-3 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-950">{erro}</p>}

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="193 310 228 228">
+  <defs>
+    <mask id="m" maskUnits="userSpaceOnUse" x="193" y="310" width="228" height="228">
+      <rect x="193" y="310" width="228" height="228" fill="#fff"/>
+      <rect x="205" y="355" width="50" height="24" rx="12" fill="#000" stroke="#000" stroke-width="14"/>
+      <rect x="205" y="415" width="50" height="24" rx="12" fill="#000" stroke="#000" stroke-width="14"/>
+      <rect x="205" y="477" width="50" height="24" rx="12" fill="#000" stroke="#000" stroke-width="14"/>
+      <polygon points="271,412 289,404 318,433 386,360 386,399 318,472" fill="#000"/>
+    </mask>
+  </defs>
+  <rect x="230" y="315" width="181" height="218" rx="28" fill="#EF780A" mask="url(#m)"/>
+  <rect x="205" y="355" width="50" height="24" rx="12" fill="#EF780A"/>
+  <rect x="205" y="415" width="50" height="24" rx="12" fill="#EF780A"/>
+  <rect x="205" y="477" width="50" height="24" rx="12" fill="#EF780A"/>
+</svg>

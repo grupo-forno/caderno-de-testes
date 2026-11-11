@@ -10,7 +10,7 @@ export default function Erro({ error, retry }: { error: unknown; retry: () => vo
       <button
         type="button"
         onClick={() => retry()}
-        className="mt-5 min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+        className="mt-5 min-h-11 rounded-md bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
       >
         Tentar de novo
       </button>

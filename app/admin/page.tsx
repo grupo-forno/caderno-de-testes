@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BookOpen, ClipboardList, LogIn, Plus } from "lucide-react";
+import Logo from "@/components/Logo";
 import AdminBar from "@/components/AdminBar";
 import Aviso from "@/components/Aviso";
 import BotaoEnviar from "@/components/BotaoEnviar";
@@ -22,6 +23,7 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
   if (!(await ehAdmin())) {
     return (
       <main className="mx-auto max-w-sm px-4 py-16">
+        <Logo sub tamanho="size-12" className="mb-8" />
         <h1 className="text-xl font-semibold">Área de quem monta os cadernos</h1>
         <form action={entrar} className="mt-5 space-y-4 rounded-lg border border-slate-200 bg-white p-5">
           <Campo rotulo="Senha" nome="senha" type="password" autoComplete="current-password" obrigatorio autoFocus />
@@ -67,7 +69,7 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
             {cadernos.map((c) => (
               <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
                 <div className="min-w-0 flex-1 basis-64">
-                  <Link href={`/admin/${c.id}`} className="break-words font-semibold text-indigo-900 underline decoration-indigo-300 underline-offset-4 hover:decoration-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                  <Link href={`/admin/${c.id}`} className="break-words font-semibold text-brand-900 underline decoration-brand-300 underline-offset-4 hover:decoration-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
                     {c.titulo}
                   </Link>
                   <p className="mt-0.5 text-sm text-slate-700">

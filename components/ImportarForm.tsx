@@ -6,7 +6,7 @@ import { btn, btn2 } from "@/components/estilos";
 import { ESTADO_INICIAL, type Resumo } from "@/lib/importacao";
 
 const MAX_BYTES = 1_000_000;
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 
 function plural(n: number, um: string, varios: string) {
   return `${n} ${n === 1 ? um : varios}`;
@@ -102,7 +102,7 @@ export default function ImportarForm({ cadernoId }: { cadernoId: string }) {
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           placeholder={"Módulo;Tela;Pop-up de;Funcionalidade;O que faz\nFinanceiro;Relatório de pedidos;;Aplicar filtros;Gera o relatório"}
-          className="mt-2 w-full resize-y rounded-md border border-slate-500 px-3 py-2 font-mono text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+          className="mt-2 w-full resize-y rounded-md border border-slate-500 px-3 py-2 font-mono text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600"
         />
         <p className="mt-1 text-xs text-slate-700">{texto.length > 0 ? `${new TextEncoder().encode(texto).length.toLocaleString("pt-BR")} de 1.000.000 letras e símbolos` : "Limite de 1 MB e 2.000 linhas."}</p>
       </div>

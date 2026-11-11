@@ -4,7 +4,7 @@ import { Confirmar } from "@/components/ui";
 import { useEffect, useState } from "react";
 import { btn, btn2, campo } from "@/components/estilos";
 
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 type Link = { texto: string; href: string | null };
 
 export type PropsDecisao = {
@@ -75,7 +75,7 @@ export default function FormDecisao(p: PropsDecisao) {
   }
 
   const opcao = (v: Decisao, desc: string, desabilitada = false) => (
-    <label key={v} className={`flex min-h-11 items-start gap-3 rounded-md border p-3 text-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-indigo-600 ${desabilitada ? "border-slate-200 bg-slate-50 text-slate-600" : decisao === v ? "border-indigo-600 bg-indigo-50" : "cursor-pointer border-slate-300 bg-white"}`}>
+    <label key={v} className={`flex min-h-11 items-start gap-3 rounded-md border p-3 text-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-600 ${desabilitada ? "border-slate-200 bg-slate-50 text-slate-600" : decisao === v ? "border-brand-600 bg-brand-50" : "cursor-pointer border-slate-300 bg-white"}`}>
       <input type="radio" name="decisao" value={v} disabled={desabilitada} checked={decisao === v} onChange={() => { setDecisao(v); setErroLocal(""); }} className="mt-1 h-5 w-5" />
       <span><strong>{ROTULOS[v]}</strong>{desabilitada && <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-800">Indisponível</span>}<span className="block text-slate-700">{desc}</span></span>
     </label>
@@ -121,7 +121,7 @@ export default function FormDecisao(p: PropsDecisao) {
       </div>
 
       {revisando && decisao && (
-        <section aria-labelledby="t-rev" className="rounded-lg border-2 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-950">
+        <section aria-labelledby="t-rev" className="rounded-lg border-2 border-brand-400 bg-brand-50 p-4 text-sm text-brand-950">
           <h3 id="t-rev" className="text-base font-semibold">Confirme o que será registrado</h3>
           <dl className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-[auto_1fr]">
             <dt className="font-medium">Decisão</dt><dd><strong>{ROTULOS[decisao]}</strong></dd>

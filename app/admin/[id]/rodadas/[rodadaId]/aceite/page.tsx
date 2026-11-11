@@ -11,7 +11,7 @@ import { registrarDecisao, reabrirRodada } from "../../../../aceite-rodada-actio
 
 export const dynamic = "force-dynamic";
 
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 const ehUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const ERROS: Record<string, string> = {
   regra: "A decisão não atende às regras: confira a justificativa e os itens em aberto.",
@@ -27,7 +27,7 @@ const COR_SIT: Record<string, string> = {
   aguardando: "bg-slate-100 text-slate-900 ring-slate-300",
   aprovada: "bg-emerald-100 text-emerald-900 ring-emerald-300",
   correcoes: "bg-amber-100 text-amber-950 ring-amber-300",
-  reaberta: "bg-indigo-100 text-indigo-900 ring-indigo-300",
+  reaberta: "bg-brand-100 text-brand-900 ring-brand-300",
 };
 
 type Retrato = { contagens?: { porAtribuicao: Record<string, number>; porCenario: Record<string, number>; porPasso: Record<string, number> }; ressalvas?: ItemAceite[]; falhasResolvidas?: ItemAceite[]; builds?: string[]; pendenciasRelacionadas?: string[]; escopo?: { titulo: string; validadores: string[] }[]; ambiente?: string | null };
@@ -47,7 +47,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
     return (
       <>
         <main className="mx-auto max-w-4xl px-4 py-8">
-          <Link href={`/admin/${id}/rodadas`} className="text-sm text-indigo-800 hover:underline">← Rodadas</Link>
+          <Link href={`/admin/${id}/rodadas`} className="text-sm text-brand-800 hover:underline">← Rodadas</Link>
           <h1 className="mt-2 text-2xl font-semibold">{r.nome}</h1>
           <p className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-800">O aceite acontece depois que a rodada é publicada e os validadores enviam os resultados. Esta rodada ainda é um rascunho.</p>
         </main>
@@ -71,7 +71,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
           {itens.map((i, k) => (
             <li key={k} className="rounded-md border border-slate-200 p-3 text-sm">
               <span className="font-semibold">{i.titulo}</span> <span className="text-slate-700">{i.detalhe}</span>{" "}
-              {ref(i.ref) && <Link href={ref(i.ref)!} className={`font-medium text-indigo-800 underline ${FOCO}`}>{rotuloLink}</Link>}
+              {ref(i.ref) && <Link href={ref(i.ref)!} className={`font-medium text-brand-800 underline ${FOCO}`}>{rotuloLink}</Link>}
             </li>
           ))}
         </ul>
@@ -92,7 +92,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   return (
     <>
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <Link href={`/admin/${id}/rodadas`} className="text-sm text-indigo-800 hover:underline">← Rodadas</Link>
+        <Link href={`/admin/${id}/rodadas`} className="text-sm text-brand-800 hover:underline">← Rodadas</Link>
         <h1 className="mt-2 text-2xl font-semibold">{r.nome} <span className="text-base font-normal text-slate-700">versão {r.versao}</span></h1>
         <AbasRodada cadernoId={id} rodadaId={rodadaId} ativa="aceite" abertas={abertas} situacaoAceite={ROTULO_SITUACAO_ACEITE[d.situacao]} />
         {sp.decisao && ultimo && ultimo.tipo !== "reabertura" && (
@@ -101,7 +101,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             <p className="mt-1">{ultimo.tipo === "correcoes" ? "Próxima ação: acompanhe as correções na aba Pendências. Quando o validador enviar os retestes, volte aqui para decidir de novo." : "A rodada está bloqueada para alterações. Se precisar continuar a validação, use “Reabrir rodada” mais abaixo."}</p>
           </div>
         )}
-        {sp.reaberta && <p role="status" className="mt-3 rounded-md border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm text-indigo-950"><strong>Rodada reaberta.</strong> As respostas voltaram a poder mudar. Próxima ação: conclua a validação e registre uma nova decisão.</p>}
+        {sp.reaberta && <p role="status" className="mt-3 rounded-md border border-brand-300 bg-brand-50 px-4 py-3 text-sm text-brand-950"><strong>Rodada reaberta.</strong> As respostas voltaram a poder mudar. Próxima ação: conclua a validação e registre uma nova decisão.</p>}
         {erro && <p role="alert" className="mt-3 rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-900">{erro}</p>}
 
         <section aria-labelledby="t-entrega" className={card}>
@@ -109,7 +109,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
           <dl className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
             <dt className="font-medium text-slate-700">Entrega</dt><dd>{r.nome}</dd>
             <dt className="font-medium text-slate-700">Versão</dt><dd>{r.versao}</dd>
-            <dt className="font-medium text-slate-700">Ambiente</dt><dd>{r.ambiente_url ? <a href={r.ambiente_url} target="_blank" rel="noreferrer" className="text-indigo-800 underline">{r.ambiente_url}</a> : "Não informado"}</dd>
+            <dt className="font-medium text-slate-700">Ambiente</dt><dd>{r.ambiente_url ? <a href={r.ambiente_url} target="_blank" rel="noreferrer" className="text-brand-800 underline">{r.ambiente_url}</a> : "Não informado"}</dd>
             <dt className="font-medium text-slate-700">Publicada em</dt><dd>{r.publicada_em ? dataHoraBR(r.publicada_em) : "—"}</dd>
             <dt className="font-medium text-slate-700">Builds em reteste</dt><dd>{s.builds.length ? s.builds.join(", ") : "Nenhum reteste concluído com sucesso ainda."}</dd>
           </dl>
@@ -198,7 +198,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                           <p className="tabular-nums">Passos: {rt.contagens.porPasso.funcionou} funcionaram, {rt.contagens.porPasso.falhasResolvidas} falhas resolvidas, {rt.contagens.porPasso.falhasAbertas} falhas em aberto, {rt.contagens.porPasso.bloqueados} bloqueados.</p>
                           {rt.builds && rt.builds.length > 0 && <p>Builds conferidos em reteste: {rt.builds.join(", ")}.</p>}
                           {rt.ressalvas && rt.ressalvas.length > 0 && (<div><p className="font-medium">Ressalvas e itens em aberto na época ({rt.ressalvas.length}):</p><ul className="list-disc pl-5">{rt.ressalvas.map((x, k) => <li key={k}>{x.titulo}. {x.detalhe}</li>)}</ul></div>)}
-                          {rt.pendenciasRelacionadas && rt.pendenciasRelacionadas.length > 0 && (<p>Pendências relacionadas: {rt.pendenciasRelacionadas.map((p, k) => <span key={p}>{k > 0 && ", "}<Link href={`${base}/pendencias/${p}`} className="text-indigo-800 underline">pendência {k + 1}</Link></span>)}.</p>)}
+                          {rt.pendenciasRelacionadas && rt.pendenciasRelacionadas.length > 0 && (<p>Pendências relacionadas: {rt.pendenciasRelacionadas.map((p, k) => <span key={p}>{k > 0 && ", "}<Link href={`${base}/pendencias/${p}`} className="text-brand-800 underline">pendência {k + 1}</Link></span>)}.</p>)}
                         </div>
                       </details>
                     )}

@@ -6,7 +6,7 @@ export default function BancoDesatualizado({ cadernoId, pagina, faltando }: { ca
   return (
     <>
       <main className="mx-auto max-w-2xl px-4 py-10">
-        <Link href={`/admin/${cadernoId}`} className="text-sm text-indigo-800 hover:underline">← Voltar ao caderno</Link>
+        <Link href={`/admin/${cadernoId}`} className="text-sm text-brand-800 hover:underline">← Voltar ao caderno</Link>
         <h1 className="mt-2 text-balance text-2xl font-semibold">{pagina} ainda não pode abrir neste ambiente</h1>
         <p role="alert" className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           O banco de dados deste ambiente ainda não recebeu a atualização que cria o que esta página usa. Seus cadernos e respostas não foram alterados.

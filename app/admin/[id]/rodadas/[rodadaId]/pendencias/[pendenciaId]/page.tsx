@@ -14,7 +14,7 @@ import { atribuirPendencia, iniciarCorrecao, registrarCorrecao, solicitarReteste
 
 export const dynamic = "force-dynamic";
 
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 const ehUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const TIPO_EVENTO: Record<string, string> = {
   aberta: "Falha registrada pelo validador",
@@ -82,7 +82,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   return (
     <>
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <Link href={`${base}/pendencias`} className="text-sm text-indigo-800 hover:underline">← Pendências da rodada</Link>
+        <Link href={`${base}/pendencias`} className="text-sm text-brand-800 hover:underline">← Pendências da rodada</Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="min-w-0 break-words text-2xl font-semibold">{snap.titulo} · passo {i + 1}</h1>
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${COR_PENDENCIA[situacao]}`}>{ROTULO_PENDENCIA[situacao]}</span>
@@ -95,7 +95,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
           <h2 id="t-ctx" className="font-semibold">Contexto</h2>
           <dl className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
             <dt className="font-medium text-slate-700">Rodada</dt><dd>{p.rodada} · versão {p.rodada_versao}</dd>
-            <dt className="font-medium text-slate-700">Ambiente</dt><dd>{p.ambiente_url ? <a href={p.ambiente_url} target="_blank" rel="noreferrer" className="text-indigo-800 underline">{p.ambiente_url}</a> : "Não informado"}</dd>
+            <dt className="font-medium text-slate-700">Ambiente</dt><dd>{p.ambiente_url ? <a href={p.ambiente_url} target="_blank" rel="noreferrer" className="text-brand-800 underline">{p.ambiente_url}</a> : "Não informado"}</dd>
             <dt className="font-medium text-slate-700">Cenário</dt><dd>{snap.titulo}</dd>
             <dt className="font-medium text-slate-700">Passo</dt><dd>{i + 1} de {snap.passos.length}{passo?.tela ? ` · ${passo.tela.modulo} › ${passo.tela.titulo}` : ""}{passo?.perfil ? ` · perfil ${passo.perfil}` : ""}</dd>
             <dt className="font-medium text-slate-700">Validador</dt><dd>{p.validador} ({p.email})</dd>
@@ -137,7 +137,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             </label>
             <BotaoEnviar variante="secundario">Salvar link</BotaoEnviar>
           </form>
-          {p.issue_url && <p className="mt-2 text-sm"><a href={p.issue_url} target="_blank" rel="noreferrer" className="text-indigo-800 underline">Abrir issue<span className="sr-only"> (abre em nova aba)</span></a></p>}
+          {p.issue_url && <p className="mt-2 text-sm"><a href={p.issue_url} target="_blank" rel="noreferrer" className="text-brand-800 underline">Abrir issue<span className="sr-only"> (abre em nova aba)</span></a></p>}
         </section>
 
         <section id="reteste" aria-labelledby="t-reteste" className={card}>
@@ -145,7 +145,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
           {situacao === "resolvida" ? (
             <p className="mt-2 text-sm text-slate-800">Esta pendência foi resolvida no reteste. Não há mais nada a pedir.</p>
           ) : pedidoAberto ? (
-            <p role="status" className="mt-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-950">O reteste {pedidoAberto.numero} está esperando {p.validador} (pedido em {dataHoraBR(pedidoAberto.solicitado_em)}, versão {pedidoAberto.versao}). Quando ele enviar, o resultado aparece aqui.</p>
+            <p role="status" className="mt-2 rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-950">O reteste {pedidoAberto.numero} está esperando {p.validador} (pedido em {dataHoraBR(pedidoAberto.solicitado_em)}, versão {pedidoAberto.versao}). Quando ele enviar, o resultado aparece aqui.</p>
           ) : podeSolicitarReteste(situacao, false) ? (
             <form action={solicitarReteste.bind(null, id, rodadaId, pendenciaId)} className="mt-2">
               <p className="text-sm text-slate-700">{retestes.length ? "Peça uma nova tentativa depois de resolver o impedimento ou a falha." : "Depois de corrigir, peça ao validador para refazer o passo."}</p>
@@ -195,7 +195,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                 <li key={t.id} className="rounded-lg border border-slate-200 p-4 text-sm">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <p className="font-semibold">Tentativa {t.numero + 1} · reteste {t.numero} · versão {t.versao}</p>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${t.status === "solicitado" ? "bg-indigo-100 text-indigo-900 ring-indigo-300" : t.resultado === "resolvida" ? COR_PENDENCIA.resolvida : t.resultado === "falhou" ? COR_PENDENCIA.aberta : COR_PENDENCIA.em_correcao}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${t.status === "solicitado" ? "bg-brand-100 text-brand-900 ring-brand-300" : t.resultado === "resolvida" ? COR_PENDENCIA.resolvida : t.resultado === "falhou" ? COR_PENDENCIA.aberta : COR_PENDENCIA.em_correcao}`}>
                       {t.status === "solicitado" ? "Aguardando o validador" : t.resultado === "resolvida" ? "Funcionou" : t.resultado === "falhou" ? "Falhou de novo" : "Bloqueado"}
                     </span>
                   </div>

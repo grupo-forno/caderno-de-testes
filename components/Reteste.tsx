@@ -9,7 +9,7 @@ import type { PassoSnap } from "@/lib/rodadas";
 import type { RespPasso } from "@/lib/tipos";
 import { usePassos } from "@/lib/usePassos";
 
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 const TEMPO = 15000;
 const dataHora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
@@ -118,14 +118,14 @@ export default function Reteste({ reteste, respostas, token, previa, aprovada, a
   const topo = (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-4">
-        <div className="min-w-0"><p className="text-sm font-medium text-violet-800">Reteste {reteste.numero}</p><h1 className="break-words text-xl font-semibold">{c.titulo}</h1></div>
+        <div className="min-w-0"><p className="text-sm font-medium text-brand-800">Reteste {reteste.numero}</p><h1 className="break-words text-xl font-semibold">{c.titulo}</h1></div>
         <div className="text-xs text-slate-700"><p aria-live="polite">{salvamento.texto}</p><p className="mt-0.5"><button type="button" onClick={aoVoltar} className={`rounded underline ${FOCO}`}>Voltar para Meus testes</button></p></div>
       </div>
     </header>
   );
   const erros = (
     <div className="space-y-3">
-      {previa && <p role="status" className="rounded-lg border border-violet-300 bg-violet-50 px-4 py-3 text-sm text-violet-950"><strong>Prévia.</strong> Nada é salvo nem enviado aqui.</p>}
+      {previa && <p role="status" className="rounded-lg border border-brand-300 bg-brand-50 px-4 py-3 text-sm text-brand-950"><strong>Prévia.</strong> Nada é salvo nem enviado aqui.</p>}
       {ps.bloqueio && <p role="alert" className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950"><strong>{ps.bloqueio}</strong> Recarregue a página para continuar.</p>}
       {ps.falhas > 0 && !ps.bloqueio && (
         <div role="alert" className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950">
@@ -215,15 +215,15 @@ export default function Reteste({ reteste, respostas, token, previa, aprovada, a
           {!enviado && (
             <div className="mt-5">
               {!confirmando ? (
-                <button type="button" disabled={previa || av.pendentes.length > 0 || ocupado || !!aprovada} onClick={() => setConfirmando(true)} className={`min-h-12 rounded-md bg-indigo-600 px-6 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 ${FOCO}`}>
+                <button type="button" disabled={previa || av.pendentes.length > 0 || ocupado || !!aprovada} onClick={() => setConfirmando(true)} className={`min-h-12 rounded-md bg-brand-600 px-6 text-base font-semibold text-white hover:bg-brand-700 disabled:opacity-50 ${FOCO}`}>
                   {ocupado ? "Aguarde: salvando…" : "Enviar reteste"}
                 </button>
               ) : (
-                <div role="alertdialog" aria-label="Confirmar envio do reteste" className="rounded-lg border border-indigo-300 bg-indigo-50 p-4 text-sm text-indigo-950">
+                <div role="alertdialog" aria-label="Confirmar envio do reteste" className="rounded-lg border border-brand-300 bg-brand-50 p-4 text-sm text-brand-950">
                   <p className="font-semibold">Enviar o reteste agora?</p>
                   <p className="mt-1">Depois de enviar, você não muda mais estas respostas. A tentativa anterior continua guardada.</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" disabled={envio.fase === "enviando"} onClick={enviar} className={`min-h-11 rounded-md bg-indigo-600 px-5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60 ${FOCO}`}>{envio.fase === "enviando" ? "Enviando…" : "Sim, enviar"}</button>
+                    <button type="button" disabled={envio.fase === "enviando"} onClick={enviar} className={`min-h-11 rounded-md bg-brand-600 px-5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60 ${FOCO}`}>{envio.fase === "enviando" ? "Enviando…" : "Sim, enviar"}</button>
                     <button type="button" onClick={() => setConfirmando(false)} className={`min-h-11 rounded-md border border-slate-400 bg-white px-5 text-sm font-medium ${FOCO}`}>Voltar</button>
                   </div>
                 </div>
@@ -231,7 +231,7 @@ export default function Reteste({ reteste, respostas, token, previa, aprovada, a
               {av.pendentes.length > 0 && <p className="mt-2 text-sm text-slate-700">Responda os passos pendentes para liberar o envio.</p>}
             </div>
           )}
-          <p className="mt-6"><button type="button" onClick={aoVoltar} className={`min-h-11 rounded text-sm font-medium text-indigo-800 underline ${FOCO}`}>Voltar para Meus testes</button></p>
+          <p className="mt-6"><button type="button" onClick={aoVoltar} className={`min-h-11 rounded text-sm font-medium text-brand-800 underline ${FOCO}`}>Voltar para Meus testes</button></p>
         </main>
       </div>
     );
@@ -245,9 +245,9 @@ export default function Reteste({ reteste, respostas, token, previa, aprovada, a
       <main className="mx-auto max-w-3xl px-4 py-6">
         {erros}
         <h2 id="titulo-tela" tabIndex={-1} className="mt-3 text-2xl font-semibold focus:outline-none">{enviado ? "Reteste enviado" : "Reteste pedido pela equipe"}</h2>
-        <section aria-labelledby="t-corr" className="mt-3 rounded-lg border border-violet-300 bg-violet-50 p-4">
-          <h3 id="t-corr" className="font-semibold text-violet-950">O que foi corrigido</h3>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-violet-950">{reteste.corrigido}</p>
+        <section aria-labelledby="t-corr" className="mt-3 rounded-lg border border-brand-300 bg-brand-50 p-4">
+          <h3 id="t-corr" className="font-semibold text-brand-950">O que foi corrigido</h3>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-brand-950">{reteste.corrigido}</p>
           <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
             <dt className="font-medium">Versão a conferir</dt><dd>{reteste.versao}</dd>
             <dt className="font-medium">Pedido por</dt><dd>{reteste.solicitadoPor}, em {dataHora(reteste.solicitadoEm)}</dd>
@@ -289,12 +289,12 @@ export default function Reteste({ reteste, respostas, token, previa, aprovada, a
         )}
 
         <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-5">
-          <button type="button" onClick={() => setVista({ t: "passo", id: primeiro })} className={`min-h-12 rounded-md bg-indigo-600 px-6 text-base font-semibold text-white hover:bg-indigo-700 ${FOCO}`}>
+          <button type="button" onClick={() => setVista({ t: "passo", id: primeiro })} className={`min-h-12 rounded-md bg-brand-600 px-6 text-base font-semibold text-white hover:bg-brand-700 ${FOCO}`}>
             {enviado ? "Consultar o que enviei" : iniciou ? "Continuar reteste" : "Começar reteste"}
           </button>
-          {!enviado && <button type="button" onClick={() => setVista({ t: "resumo" })} className={`min-h-11 rounded-md border border-indigo-700 bg-white px-5 text-sm font-semibold text-indigo-900 hover:bg-indigo-50 ${FOCO}`}>Enviar reteste</button>}
+          {!enviado && <button type="button" onClick={() => setVista({ t: "resumo" })} className={`min-h-11 rounded-md border border-brand-700 bg-white px-5 text-sm font-semibold text-brand-900 hover:bg-brand-50 ${FOCO}`}>Enviar reteste</button>}
           {enviado && <button type="button" onClick={() => setVista({ t: "resumo" })} className={`min-h-11 rounded-md border border-slate-400 bg-white px-5 text-sm font-medium ${FOCO}`}>Ver resumo</button>}
-          <button type="button" onClick={aoVoltar} className={`min-h-11 rounded px-3 text-sm font-medium text-indigo-800 underline ${FOCO}`}>Voltar para Meus testes</button>
+          <button type="button" onClick={aoVoltar} className={`min-h-11 rounded px-3 text-sm font-medium text-brand-800 underline ${FOCO}`}>Voltar para Meus testes</button>
         </div>
       </main>
     </div>

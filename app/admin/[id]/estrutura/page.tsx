@@ -197,7 +197,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                             <div className={`min-w-0 ${nivel ? "pl-5" : ""}`}>
                               <p className="flex items-start gap-1.5 break-words font-medium">
                                 {nivel > 0 && <CornerDownRight aria-hidden="true" className="mt-1 size-4 shrink-0 text-slate-500" />}
-                                <Link href={editar} className="rounded text-indigo-900 underline decoration-indigo-300 underline-offset-4 hover:decoration-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">{t.titulo}</Link>
+                                <Link href={editar} className="rounded text-brand-900 underline decoration-brand-300 underline-offset-4 hover:decoration-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">{t.titulo}</Link>
                               </p>
                               <p className="mt-0.5 text-xs text-slate-700">
                                 {nivel > 0 ? `Pop-up de “${pai}”` : modoDaTela(t) === "funcional" ? "Teste funcional" : "Revisão de desenho"}

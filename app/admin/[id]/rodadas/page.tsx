@@ -12,7 +12,7 @@ import { criarRodada, excluirRodada } from "../../rodada-actions";
 
 export const dynamic = "force-dynamic";
 
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 const ehUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const dia = (d: string | null) => (d ? d.split("-").reverse().join("/") : "Sem prazo");
 
@@ -31,7 +31,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   return (
     <>
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <Link href={`/admin/${id}`} className="text-sm text-indigo-800 hover:underline">← {cad.titulo}</Link>
+        <Link href={`/admin/${id}`} className="text-sm text-brand-800 hover:underline">← {cad.titulo}</Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold">Rodadas de homologação</h1>
           <NovaRodada acao={criarRodada.bind(null, id)} versao={cad.versao} />
@@ -55,15 +55,15 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                 <li key={r.id} className="rounded-lg border border-slate-200 bg-white p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <h2 className="min-w-0 break-words text-base font-semibold">
-                      <Link href={`/admin/${id}/rodadas/${r.id}`} className={`rounded text-indigo-900 hover:underline ${FOCO}`}>{r.nome}</Link>
+                      <Link href={`/admin/${id}/rodadas/${r.id}`} className={`rounded text-brand-900 hover:underline ${FOCO}`}>{r.nome}</Link>
                       <span className="ml-2 text-sm font-normal text-slate-700">versão {r.versao}</span>
                     </h2>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${r.situacao === "rascunho" ? "bg-slate-100 text-slate-800 ring-slate-300" : "bg-indigo-100 text-indigo-900 ring-indigo-300"}`}>{ROTULO_SITUACAO[r.situacao as "rascunho" | "em_validacao"]}</span>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${r.situacao === "rascunho" ? "bg-slate-100 text-slate-800 ring-slate-300" : "bg-brand-100 text-brand-900 ring-brand-300"}`}>{ROTULO_SITUACAO[r.situacao as "rascunho" | "em_validacao"]}</span>
                   </div>
                   <p className="mt-1 text-sm text-slate-700">Prazo: {dia(r.prazo)}</p>
                   {p ? (
                     <>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Passos respondidos" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><div className="h-full bg-indigo-600" style={{ width: `${pct}%` }} /></div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Passos respondidos" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><div className="h-full bg-brand-600" style={{ width: `${pct}%` }} /></div>
                       <p className="mt-1 text-sm tabular-nums text-slate-800">
                         {p.geral.respondidos} de {p.geral.total} passos respondidos · {p.enviadas} de {p.atribuicoes} testes enviados
                         {p.geral.diferente > 0 && <span className="font-semibold text-rose-800"> · {p.geral.diferente} deu diferente</span>}

@@ -10,8 +10,8 @@ export default function AdminNav() {
   return (
     <nav aria-label="Área interna" className="flex items-center gap-4 text-sm">
       <Link href={`/admin/${id}`} className="min-h-11 content-center hover:underline">Caderno</Link>
-      <Link href={`/admin/${id}/biblioteca`} className="min-h-11 content-center font-medium text-indigo-800 hover:underline">Biblioteca de testes</Link>
-      <Link href={`/admin/${id}/rodadas`} className="min-h-11 content-center font-medium text-indigo-800 hover:underline">Rodadas</Link>
+      <Link href={`/admin/${id}/biblioteca`} className="min-h-11 content-center font-medium text-brand-800 hover:underline">Biblioteca de testes</Link>
+      <Link href={`/admin/${id}/rodadas`} className="min-h-11 content-center font-medium text-brand-800 hover:underline">Rodadas</Link>
     </nav>
   );
 }

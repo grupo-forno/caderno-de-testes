@@ -52,7 +52,7 @@ export default function SelecaoCenarios({ acao, cenarios, modulos, perfis }: { a
       <ul className="mt-2 space-y-2">
         {lista.map((c) => (
           <li key={c.id} hidden={!visivel(c)}>
-            <label className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-md border p-3 text-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-indigo-600 ${marcados.has(c.id) ? "border-indigo-500 bg-indigo-50" : "border-slate-300 bg-white"}`}>
+            <label className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-md border p-3 text-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-600 ${marcados.has(c.id) ? "border-brand-500 bg-brand-50" : "border-slate-300 bg-white"}`}>
               <input
                 type="checkbox"
                 name="cenario"

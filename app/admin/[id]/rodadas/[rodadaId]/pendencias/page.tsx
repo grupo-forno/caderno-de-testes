@@ -9,7 +9,7 @@ import { dataHoraBR, listarBloqueios, listarPendencias } from "@/lib/pendenciasD
 
 export const dynamic = "force-dynamic";
 
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 const ehUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const um = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
 
@@ -44,7 +44,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   return (
     <>
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <Link href={`/admin/${id}/rodadas`} className="text-sm text-indigo-800 hover:underline">← Rodadas</Link>
+        <Link href={`/admin/${id}/rodadas`} className="text-sm text-brand-800 hover:underline">← Rodadas</Link>
         <h1 className="mt-2 text-2xl font-semibold">{r.nome} <span className="text-base font-normal text-slate-700">versão {r.versao}</span></h1>
         {r.situacao === "em_validacao" && <AbasRodada cadernoId={id} rodadaId={rodadaId} ativa="pendencias" abertas={paraTratar} />}
         {sp.erro === "pendencia" && <p role="alert" className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">Essa pendência não existe mais. Confira a lista abaixo.</p>}
@@ -73,7 +73,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
               </label>
               <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
                 <button className={btn2 + " min-h-11"}>Filtrar</button>
-                {filtrando && <Link href={`${base}/pendencias`} className={`inline-flex min-h-11 items-center text-sm text-indigo-800 underline ${FOCO}`}>Limpar filtros</Link>}
+                {filtrando && <Link href={`${base}/pendencias`} className={`inline-flex min-h-11 items-center text-sm text-brand-800 underline ${FOCO}`}>Limpar filtros</Link>}
               </div>
             </form>
 
@@ -88,7 +88,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                   <li key={p.id} className="rounded-lg border border-slate-200 bg-white p-4">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <h2 className="min-w-0 break-words text-base font-semibold">
-                        <Link href={`${base}/pendencias/${p.id}`} className={`rounded text-indigo-900 hover:underline ${FOCO}`}>{p.cenario} · passo {p.n}</Link>
+                        <Link href={`${base}/pendencias/${p.id}`} className={`rounded text-brand-900 hover:underline ${FOCO}`}>{p.cenario} · passo {p.n}</Link>
                       </h2>
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${COR_PENDENCIA[p.situacao]}`}>{ROTULO_PENDENCIA[p.situacao]}</span>
                     </div>
@@ -112,7 +112,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                   {bloqueios.map((b, i) => (
                     <li key={i} className="rounded-md border border-amber-200 bg-white p-3 text-sm">
                       <p className="font-semibold">{b.cenario} · passo {b.n} <span className="font-normal text-slate-700">({b.modulo})</span></p>
-                      <p className="text-xs text-slate-700">{b.validador} · {b.origem}{b.pendencia && <> · <Link href={`${base}/pendencias/${b.pendencia}`} className="font-medium text-indigo-800 underline">Ver pendência</Link></>}</p>
+                      <p className="text-xs text-slate-700">{b.validador} · {b.origem}{b.pendencia && <> · <Link href={`${base}/pendencias/${b.pendencia}`} className="font-medium text-brand-800 underline">Ver pendência</Link></>}</p>
                       <p className="mt-1 whitespace-pre-wrap"><span className="font-medium">Motivo:</span> {b.obs || "sem explicação"}</p>
                     </li>
                   ))}

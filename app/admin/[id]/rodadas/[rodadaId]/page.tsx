@@ -18,11 +18,11 @@ import { adicionarValidador, novaRodadaAPartirDe, novoLinkDeConvite, publicarRod
 
 export const dynamic = "force-dynamic";
 
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 const ehUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const dia = (d: string | null) => (d ? d.split("-").reverse().join("/") : "Sem prazo");
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
-const COR_ESTADO = { sem_resposta: "bg-white text-slate-800 ring-slate-400", em_andamento: "bg-amber-100 text-amber-950 ring-amber-300", enviado: "bg-indigo-100 text-indigo-900 ring-indigo-300" } as const;
+const COR_ESTADO = { sem_resposta: "bg-white text-slate-800 ring-slate-400", em_andamento: "bg-amber-100 text-amber-950 ring-amber-300", enviado: "bg-brand-100 text-brand-900 ring-brand-300" } as const;
 
 const ERROS: Record<string, string> = {
   nome: "Escreva o nome da entrega.",
@@ -51,15 +51,15 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
 
   const topo = (
     <>
-      <Link href={`/admin/${id}/rodadas`} className="text-sm text-indigo-800 hover:underline">← Rodadas</Link>
+      <Link href={`/admin/${id}/rodadas`} className="text-sm text-brand-800 hover:underline">← Rodadas</Link>
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <h1 className="min-w-0 break-words text-2xl font-semibold">{r.nome}</h1>
-        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${r.situacao === "rascunho" ? "bg-slate-100 text-slate-800 ring-slate-300" : "bg-indigo-100 text-indigo-900 ring-indigo-300"}`}>{ROTULO_SITUACAO[r.situacao as "rascunho" | "em_validacao"]}</span>
+        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${r.situacao === "rascunho" ? "bg-slate-100 text-slate-800 ring-slate-300" : "bg-brand-100 text-brand-900 ring-brand-300"}`}>{ROTULO_SITUACAO[r.situacao as "rascunho" | "em_validacao"]}</span>
       </div>
       <p className="text-sm text-slate-700">{cad.titulo} · versão {r.versao}{r.publicada_em ? ` · publicada em ${dataHora(r.publicada_em)}` : ""}</p>
       {sp.salvo && <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">Salvo.</p>}
       {sp.publicada && <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">Rodada publicada. Copie o link de acesso de cada validador abaixo e envie para ele.</p>}
-      {sp.nova && <p role="status" className="mt-3 rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">Nova rodada preparada a partir de “{r.nome.replace(/ \(nova\)$/, "")}”, com os mesmos cenários, validadores e atribuições. Ajuste e publique.</p>}
+      {sp.nova && <p role="status" className="mt-3 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-900">Nova rodada preparada a partir de “{r.nome.replace(/ \(nova\)$/, "")}”, com os mesmos cenários, validadores e atribuições. Ajuste e publique.</p>}
       {erro && <p role="alert" className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">{erro}</p>}
     </>
   );
@@ -81,7 +81,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             <h2 id="t-entrega" className="font-semibold">Entrega</h2>
             <dl className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
               <dt className="font-medium text-slate-700">Versão</dt><dd>{r.versao}</dd>
-              <dt className="font-medium text-slate-700">Ambiente</dt><dd>{r.ambiente_url ? <a href={r.ambiente_url} target="_blank" rel="noreferrer" className="text-indigo-800 underline">{r.ambiente_url}</a> : "Não informado"}</dd>
+              <dt className="font-medium text-slate-700">Ambiente</dt><dd>{r.ambiente_url ? <a href={r.ambiente_url} target="_blank" rel="noreferrer" className="text-brand-800 underline">{r.ambiente_url}</a> : "Não informado"}</dd>
               <dt className="font-medium text-slate-700">Prazo</dt><dd>{dia(r.prazo_txt)}</dd>
             </dl>
             <details className="mt-3 rounded-md border border-slate-200">
@@ -174,7 +174,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                         <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${f.enviado ? COR_ESTADO.enviado : COR_ESTADO.em_andamento}`}>{f.enviado ? "Enviado" : "Ainda não enviado"}</span>
                       </span>
                     </div>
-                    <p className="text-xs text-slate-700">{f.validador}{f.perfil ? ` · perfil ${f.perfil}` : ""}{f.pendenciaId && <> · <Link href={`${aqui}/pendencias/${f.pendenciaId}`} className="font-medium text-indigo-800 underline">Ver pendência</Link></>}</p>
+                    <p className="text-xs text-slate-700">{f.validador}{f.perfil ? ` · perfil ${f.perfil}` : ""}{f.pendenciaId && <> · <Link href={`${aqui}/pendencias/${f.pendenciaId}`} className="font-medium text-brand-800 underline">Ver pendência</Link></>}</p>
                     <p className="mt-2 whitespace-pre-wrap"><span className="font-medium">O que fazer:</span> {f.fazer}</p>
                     <p className="mt-1 whitespace-pre-wrap"><span className="font-medium">O que deveria acontecer:</span> {f.esperado}</p>
                     <p className="mt-1 whitespace-pre-wrap"><span className="font-medium">{f.resultado === "diferente" ? "O que o validador viu:" : "Por que não conseguiu testar:"}</span> {f.obs || "sem explicação"}</p>
@@ -287,7 +287,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
 
         <section id="secao-cenarios" aria-labelledby="t-cen" className={secao}>
           <h2 id="t-cen" className="text-lg font-semibold">2. O que será testado</h2>
-          <p className="mt-1 text-sm text-slate-700">Escolha os <strong>roteiros das telas</strong> (o passo a passo de cada funcionalidade, que você edita na própria tela) e, se houver, os <Link href={`/admin/${id}/biblioteca`} className="text-indigo-800 underline">fluxos entre telas</Link>. O roteiro é lido da tela no momento de publicar.</p>
+          <p className="mt-1 text-sm text-slate-700">Escolha os <strong>roteiros das telas</strong> (o passo a passo de cada funcionalidade, que você edita na própria tela) e, se houver, os <Link href={`/admin/${id}/biblioteca`} className="text-brand-800 underline">fluxos entre telas</Link>. O roteiro é lido da tela no momento de publicar.</p>
           <SelecaoCenarios acao={salvarCenariosDaRodada.bind(null, id, rodadaId)} cenarios={opcoes} modulos={todosModulos} perfis={todosPerfis} />
         </section>
 

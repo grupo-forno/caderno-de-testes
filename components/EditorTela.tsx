@@ -45,8 +45,8 @@ const MENSAGEM_SERVIDOR: Record<string, { texto: string; aba?: Aba; campo?: stri
 function OpcaoRadio({ nome, valor, atual, aoMudar, titulo, texto, desabilitada }: { nome: string; valor: string; atual: string; aoMudar: (v: string) => void; titulo: string; texto: string; desabilitada?: boolean }) {
   const on = atual === valor;
   return (
-    <label className={`flex gap-3 rounded-lg border p-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-indigo-600 ${desabilitada ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-600" : on ? "cursor-pointer border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600" : "cursor-pointer border-slate-300 bg-white hover:bg-slate-50"}`}>
-      <input type="radio" name={nome} value={valor} checked={on} disabled={desabilitada} onChange={() => aoMudar(valor)} className="mt-1 size-4 shrink-0 accent-indigo-600" />
+    <label className={`flex gap-3 rounded-lg border p-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-600 ${desabilitada ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-600" : on ? "cursor-pointer border-brand-600 bg-brand-50 ring-1 ring-brand-600" : "cursor-pointer border-slate-300 bg-white hover:bg-slate-50"}`}>
+      <input type="radio" name={nome} value={valor} checked={on} disabled={desabilitada} onChange={() => aoMudar(valor)} className="mt-1 size-4 shrink-0 accent-brand-600" />
       <span>
         <span className="block text-sm font-semibold">{titulo}</span>
         <span className="block text-xs text-slate-700">{texto}</span>
@@ -343,11 +343,11 @@ export default function EditorTela({ cadernoId, telaId, inicial, modulos, princi
                       <p className="text-sm font-medium">Ambiente de homologação</p>
                       {ambienteUrl ? (
                         <p className="mt-0.5 break-all text-sm">
-                          <a href={ambienteUrl} target="_blank" rel="noreferrer" className="text-indigo-800 underline">{ambienteUrl}<span className="sr-only"> (abre em nova aba)</span></a>
-                          <span className="block text-xs text-slate-700">Herdado do caderno. <Link href={`/admin/${cadernoId}/editar`} className="text-indigo-800 underline">Alterar em Editar caderno</Link></span>
+                          <a href={ambienteUrl} target="_blank" rel="noreferrer" className="text-brand-800 underline">{ambienteUrl}<span className="sr-only"> (abre em nova aba)</span></a>
+                          <span className="block text-xs text-slate-700">Herdado do caderno. <Link href={`/admin/${cadernoId}/editar`} className="text-brand-800 underline">Alterar em Editar caderno</Link></span>
                         </p>
                       ) : (
-                        <p className="mt-0.5 text-sm text-slate-800">Não cadastrado. <Link href={`/admin/${cadernoId}/editar`} className="text-indigo-800 underline">Cadastrar em Editar caderno</Link></p>
+                        <p className="mt-0.5 text-sm text-slate-800">Não cadastrado. <Link href={`/admin/${cadernoId}/editar`} className="text-brand-800 underline">Cadastrar em Editar caderno</Link></p>
                       )}
                     </div>
                     <div>
@@ -365,7 +365,7 @@ export default function EditorTela({ cadernoId, telaId, inicial, modulos, princi
                 <p className={`mt-4 rounded-md border px-3 py-2 text-sm ${acesso.tipo === "incompleto" ? "border-amber-300 bg-amber-50 text-amber-950" : "border-slate-200 bg-slate-50 text-slate-900"}`}>
                   <span className="font-medium">O que o validador verá: </span>
                   {acesso.tipo === "menu" ? <>{acesso.texto} Caminho: <strong>{acesso.caminho}</strong>.</> : acesso.texto}
-                  {acesso.tipo === "menu" && acesso.url && <> <a href={acesso.url} target="_blank" rel="noreferrer" className="text-indigo-800 underline">Abrir o ambiente<span className="sr-only"> (abre em nova aba)</span></a></>}
+                  {acesso.tipo === "menu" && acesso.url && <> <a href={acesso.url} target="_blank" rel="noreferrer" className="text-brand-800 underline">Abrir o ambiente<span className="sr-only"> (abre em nova aba)</span></a></>}
                 </p>
               </Secao>
             </div>
@@ -384,7 +384,7 @@ export default function EditorTela({ cadernoId, telaId, inicial, modulos, princi
                       <li key={p.texto} className="flex flex-wrap items-start gap-2 text-sm">
                         <Etiqueta tom={p.bloqueia ? "erro" : "alerta"}>{p.bloqueia ? "Obrigatório" : "Sugestão"}</Etiqueta>
                         <span className="min-w-0 flex-1">{p.texto}</span>
-                        <button type="button" onClick={() => irPara(p.aba, p.campo)} className={`rounded text-xs text-indigo-800 underline ${FOCO}`}>Ir para o campo</button>
+                        <button type="button" onClick={() => irPara(p.aba, p.campo)} className={`rounded text-xs text-brand-800 underline ${FOCO}`}>Ir para o campo</button>
                       </li>
                     ))}
                   </ul>
@@ -470,7 +470,7 @@ export default function EditorTela({ cadernoId, telaId, inicial, modulos, princi
               <summary className={`flex min-h-11 cursor-pointer items-center rounded-lg px-4 text-sm font-semibold ${FOCO}`}>Opções avançadas: PDF próprio</summary>
               <div className="space-y-3 border-t border-slate-200 px-4 py-4">
                 <label className="flex items-start gap-2 text-sm">
-                  <input type="checkbox" checked={pdfProprio} onChange={(e) => setPdfProprio(e.target.checked)} className="mt-0.5 size-4 accent-indigo-600" />
+                  <input type="checkbox" checked={pdfProprio} onChange={(e) => setPdfProprio(e.target.checked)} className="mt-0.5 size-4 accent-brand-600" />
                   <span>
                     <span className="font-medium">Enviar um PDF meu</span>
                     <span className="block text-xs text-slate-700">Sem marcar, o PDF das funcionalidades é gerado sozinho com a lista acima.</span>
@@ -486,7 +486,7 @@ export default function EditorTela({ cadernoId, telaId, inicial, modulos, princi
                 <ul className="mt-2 space-y-1 text-sm">
                   {cenarios.map((c) => (
                     <li key={c.id}>
-                      <Link href={`/admin/${cadernoId}/biblioteca/${c.id}`} className="text-indigo-800 underline">{c.titulo}</Link>
+                      <Link href={`/admin/${cadernoId}/biblioteca/${c.id}`} className="text-brand-800 underline">{c.titulo}</Link>
                       {c.arquivado && <span className="ml-2"><Etiqueta>Arquivado</Etiqueta></span>}
                     </li>
                   ))}

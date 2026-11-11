@@ -27,7 +27,7 @@ export default function CabecalhoPagina({ titulo, descricao, migalhas, voltar, a
             {migalhas.map((m, i) => (
               <li key={m.rotulo} className="flex items-center gap-1">
                 {i > 0 && <ChevronRight aria-hidden="true" className="size-4 text-slate-500" />}
-                {m.href ? <Link href={m.href} className="inline-flex min-h-11 items-center rounded px-1 text-indigo-800 underline underline-offset-2 hover:text-indigo-950 focus-visible:outline-2 focus-visible:outline-indigo-600 sm:min-h-8">{m.rotulo}</Link> : <span aria-current="page" className="inline-flex min-h-11 items-center px-1 font-medium text-slate-900 sm:min-h-8">{m.rotulo}</span>}
+                {m.href ? <Link href={m.href} className="inline-flex min-h-11 items-center rounded px-1 text-brand-800 underline underline-offset-2 hover:text-brand-950 focus-visible:outline-2 focus-visible:outline-brand-600 sm:min-h-8">{m.rotulo}</Link> : <span aria-current="page" className="inline-flex min-h-11 items-center px-1 font-medium text-slate-900 sm:min-h-8">{m.rotulo}</span>}
               </li>
             ))}
           </ol>

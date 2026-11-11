@@ -112,7 +112,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
         <section aria-label="Indicadores do caderno" className="flex flex-wrap divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white sm:divide-x sm:divide-y-0">
           {indicador(`${base}/estrutura`, telas.length, "Telas cadastradas", `${nModulos} ${nModulos === 1 ? "módulo" : "módulos"}`, <LayoutList />, "bg-slate-100 text-slate-700")}
           {indicador(destinoCorrigir, pend.corrigir, "Para corrigir", pend.corrigir ? "Falhas esperando ajuste da equipe" : "Nada esperando ajuste", <AlertTriangle />, pend.corrigir ? "bg-rose-100 text-rose-800" : "bg-slate-100 text-slate-700")}
-          {indicador(destinoReteste, pend.reteste, "Aguardando reteste", pend.reteste ? "Corrigido, falta o validador testar de novo" : "Nada esperando reteste", <Hourglass />, pend.reteste ? "bg-indigo-100 text-indigo-800" : "bg-slate-100 text-slate-700")}
+          {indicador(destinoReteste, pend.reteste, "Aguardando reteste", pend.reteste ? "Corrigido, falta o validador testar de novo" : "Nada esperando reteste", <Hourglass />, pend.reteste ? "bg-brand-100 text-brand-800" : "bg-slate-100 text-slate-700")}
         </section>
 
         <div className="mt-6">
@@ -123,7 +123,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
               <ul className="divide-y divide-slate-100">
                 {passos.map((p) => (
                   <li key={p.texto}>
-                    <Link href={p.href} className={`flex min-h-11 items-center justify-between gap-3 rounded text-sm hover:text-indigo-900 ${FOCO}`}>
+                    <Link href={p.href} className={`flex min-h-11 items-center justify-between gap-3 rounded text-sm hover:text-brand-900 ${FOCO}`}>
                       <span>{p.texto}</span>
                       <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
                     </Link>

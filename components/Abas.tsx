@@ -33,7 +33,7 @@ export function Abas({ abas, ativa, aoMudar, rotulo }: { abas: AbaDef[]; ativa: 
             aria-controls={`painel-${a.id}`}
             tabIndex={on ? 0 : -1}
             onClick={() => aoMudar(a.id)}
-            className={`-mb-px inline-flex min-h-11 shrink-0 items-center gap-2 border-b-2 px-3 text-sm sm:min-h-10 [&>svg]:size-4 ${FOCO} ${on ? "border-indigo-600 font-semibold text-indigo-900" : "border-transparent text-slate-700 hover:border-slate-300 hover:text-slate-900"}`}
+            className={`-mb-px inline-flex min-h-11 shrink-0 items-center gap-2 border-b-2 px-3 text-sm sm:min-h-10 [&>svg]:size-4 ${FOCO} ${on ? "border-brand-600 font-semibold text-brand-900" : "border-transparent text-slate-700 hover:border-slate-300 hover:text-slate-900"}`}
           >
             {a.icone}
             {a.rotulo}

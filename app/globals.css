@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/* Cor da marca: o laranja da logo (#EF780A) é o 500. O 600 para baixo escurece o suficiente para texto branco em botão
+   (contraste de 4,5 para 1 ou mais). Todas as classes brand-* do app saem daqui. */
+@theme {
+  --color-brand-50: #fff5eb;
+  --color-brand-100: #ffe9d1;
+  --color-brand-200: #ffd3a3;
+  --color-brand-300: #ffb566;
+  --color-brand-400: #fa972e;
+  --color-brand-500: #ef780a;
+  --color-brand-600: #b85c00;
+  --color-brand-700: #8f4b05;
+  --color-brand-800: #743f06;
+  --color-brand-900: #562f06;
+  --color-brand-950: #2f1a04;
+}
+
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 type Tom = "neutro" | "info" | "sucesso" | "alerta" | "erro";
 const COR: Record<Tom, string> = {
   neutro: "bg-slate-100 text-slate-800 ring-slate-300",
-  info: "bg-indigo-50 text-indigo-900 ring-indigo-300",
+  info: "bg-brand-50 text-brand-900 ring-brand-300",
   sucesso: "bg-emerald-100 text-emerald-900 ring-emerald-300",
   alerta: "bg-amber-100 text-amber-950 ring-amber-400",
   erro: "bg-rose-100 text-rose-900 ring-rose-300",

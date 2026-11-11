@@ -11,7 +11,7 @@ import { duplicarCenario, mudarSituacaoCenario } from "../../cenario-actions";
 
 export const dynamic = "force-dynamic";
 
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 const ehUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const um = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
 
@@ -56,7 +56,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   return (
     <>
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <Link href={`/admin/${id}`} className="text-sm text-indigo-800 hover:underline">← {cad.titulo}</Link>
+        <Link href={`/admin/${id}`} className="text-sm text-brand-800 hover:underline">← {cad.titulo}</Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold">Fluxos entre telas</h1>
           <Link href={`/admin/${id}/biblioteca/novo`} className={btn + " inline-flex min-h-11 items-center"}>Novo cenário</Link>
@@ -95,7 +95,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
           </label>
           <div className="flex items-end gap-2">
             <button className={btn2 + " min-h-11"}>Filtrar</button>
-            {filtrando && <Link href={`/admin/${id}/biblioteca`} className={`inline-flex min-h-11 items-center text-sm text-indigo-800 underline ${FOCO}`}>Limpar filtros</Link>}
+            {filtrando && <Link href={`/admin/${id}/biblioteca`} className={`inline-flex min-h-11 items-center text-sm text-brand-800 underline ${FOCO}`}>Limpar filtros</Link>}
           </div>
           {fTela && <input type="hidden" name="tela" value={fTela} />}
         </form>
@@ -121,7 +121,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
               <li key={c.id} className="rounded-lg border border-slate-200 bg-white p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <h2 className="min-w-0 break-words text-base font-semibold">
-                    <Link href={`/admin/${id}/biblioteca/${c.id}`} className={`rounded text-indigo-900 hover:underline ${FOCO}`}>{c.titulo}</Link>
+                    <Link href={`/admin/${id}/biblioteca/${c.id}`} className={`rounded text-brand-900 hover:underline ${FOCO}`}>{c.titulo}</Link>
                   </h2>
                   <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${c.situacao === "ativo" ? "bg-emerald-100 text-emerald-900 ring-emerald-300" : "bg-slate-100 text-slate-700 ring-slate-300"}`}>
                     {c.situacao === "ativo" ? "Ativo" : "Arquivado"}

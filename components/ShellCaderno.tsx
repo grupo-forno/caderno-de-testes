@@ -1,5 +1,6 @@
 "use client";
 
+import Logo from "@/components/Logo";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef, type ReactNode } from "react";
@@ -29,7 +30,7 @@ function Navegacao({ cadernoId, nome, aoNavegar }: { cadernoId: string; nome: st
         href={d.href}
         onClick={aoNavegar}
         aria-current={d.ativo ? "page" : undefined}
-        className={`flex min-h-11 items-center gap-2.5 rounded-md px-2.5 text-sm lg:min-h-9 [&>svg]:size-4 [&>svg]:shrink-0 ${FOCO} ${d.ativo ? "bg-indigo-50 font-semibold text-indigo-900 [&>svg]:text-indigo-700" : "text-slate-700 hover:bg-slate-100 hover:text-slate-900 [&>svg]:text-slate-500"}`}
+        className={`flex min-h-11 items-center gap-2.5 rounded-md px-2.5 text-sm lg:min-h-9 [&>svg]:size-4 [&>svg]:shrink-0 ${FOCO} ${d.ativo ? "bg-brand-50 font-semibold text-brand-900 [&>svg]:text-brand-700" : "text-slate-700 hover:bg-slate-100 hover:text-slate-900 [&>svg]:text-slate-500"}`}
       >
         {d.icone}
         {d.rotulo}
@@ -40,12 +41,13 @@ function Navegacao({ cadernoId, nome, aoNavegar }: { cadernoId: string; nome: st
   return (
     <div className="flex h-full flex-col">
       <div className="px-3 pt-3">
+        <Link href="/admin" onClick={aoNavegar} aria-label="Caderno de testes: voltar para Seus cadernos" className={`mb-2 inline-flex rounded-md px-1.5 py-1 text-sm ${FOCO}`}><Logo tamanho="size-7" /></Link>
         <Link href="/admin" onClick={aoNavegar} className={`inline-flex min-h-11 items-center gap-1.5 rounded-md px-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 lg:min-h-8 [&>svg]:size-3.5 ${FOCO}`}>
           <ArrowLeft aria-hidden="true" />
           Seus cadernos
         </Link>
         <div className="mt-2 flex items-start gap-2 px-1.5 pb-3">
-          <BookOpen aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-indigo-700" />
+          <BookOpen aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-brand-700" />
           <div className="min-w-0">
             <p className="text-xs text-slate-600">Caderno</p>
             <p className="break-words text-sm font-semibold leading-snug">{nome}</p>
@@ -75,7 +77,7 @@ export default function ShellCaderno({ cadernoId, nome, children }: { cadernoId:
   const painel = useRef<HTMLDialogElement>(null);
   return (
     <div className="min-h-screen lg:flex">
-      <a href="#conteudo" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg focus:outline-2 focus:outline-indigo-600">Ir para o conteúdo</a>
+      <a href="#conteudo" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg focus:outline-2 focus:outline-brand-600">Ir para o conteúdo</a>
       <aside className="hidden w-56 shrink-0 border-r border-slate-200 bg-white lg:sticky lg:top-0 lg:block lg:h-screen">
         <Navegacao cadernoId={cadernoId} nome={nome} />
       </aside>

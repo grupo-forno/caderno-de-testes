@@ -16,7 +16,7 @@ export default async function Page({ params }: PageProps<"/admin/[id]/importar">
   return (
     <>
       <main className="mx-auto max-w-3xl px-4 py-8">
-        <Link href={`/admin/${id}`} className="text-sm text-indigo-800 hover:underline">← Voltar ao caderno</Link>
+        <Link href={`/admin/${id}`} className="text-sm text-brand-800 hover:underline">← Voltar ao caderno</Link>
         <h1 className="mt-2 text-2xl font-semibold">Importar de uma planilha</h1>
         <p className="mt-1 text-sm text-slate-700">Caderno: {c.titulo}</p>
 

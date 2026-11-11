@@ -9,7 +9,7 @@ export const ROTULO_PENDENCIA: Record<SituacaoPendencia, string> = { aberta: "Ab
 export const COR_PENDENCIA: Record<SituacaoPendencia, string> = {
   aberta: "bg-rose-100 text-rose-900 ring-rose-300",
   em_correcao: "bg-amber-100 text-amber-950 ring-amber-300",
-  aguardando_reteste: "bg-indigo-100 text-indigo-900 ring-indigo-300",
+  aguardando_reteste: "bg-brand-100 text-brand-900 ring-brand-300",
   resolvida: "bg-emerald-100 text-emerald-900 ring-emerald-300",
 };
 

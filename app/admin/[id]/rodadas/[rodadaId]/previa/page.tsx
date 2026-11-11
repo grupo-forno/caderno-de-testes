@@ -52,7 +52,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   return (
     <>
       <div className="mx-auto max-w-5xl px-4 pt-4">
-        <Link href={`/admin/${id}/rodadas/${rodadaId}`} className="text-sm text-indigo-800 hover:underline">← Voltar à rodada</Link>
+        <Link href={`/admin/${id}/rodadas/${rodadaId}`} className="text-sm text-brand-800 hover:underline">← Voltar à rodada</Link>
       </div>
       <MeusTestes dados={dados} previa />
     </>

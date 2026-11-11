@@ -3,7 +3,7 @@ import Link from "next/link";
 // Abas de uma rodada publicada: visão geral, pendências e aceite
 export default function AbasRodada({ cadernoId, rodadaId, ativa, abertas, situacaoAceite }: { cadernoId: string; rodadaId: string; ativa: "geral" | "pendencias" | "aceite"; abertas: number; situacaoAceite?: string }) {
   const base = `/admin/${cadernoId}/rodadas/${rodadaId}`;
-  const aba = (on: boolean) => `inline-flex min-h-11 items-center rounded-t-md border-b-2 px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-indigo-600 ${on ? "border-indigo-700 text-indigo-900" : "border-transparent text-slate-700 hover:bg-slate-100"}`;
+  const aba = (on: boolean) => `inline-flex min-h-11 items-center rounded-t-md border-b-2 px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand-600 ${on ? "border-brand-700 text-brand-900" : "border-transparent text-slate-700 hover:bg-slate-100"}`;
   return (
     <nav aria-label="Abas da rodada" className="mt-4 flex flex-wrap gap-1 border-b border-slate-200">
       <Link href={base} aria-current={ativa === "geral" ? "page" : undefined} className={aba(ativa === "geral")}>Visão geral</Link>

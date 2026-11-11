@@ -1,5 +1,6 @@
 "use client";
 
+import Logo from "@/components/Logo";
 import { useEffect, useMemo, useState } from "react";
 import Execucao, { ChipEstado, type PassoFila } from "@/components/Execucao";
 import Reteste, { type RetesteDados } from "@/components/Reteste";
@@ -8,7 +9,7 @@ import { pendentes as passosPendentes, progresso, ROTULO_ESTADO_ATRIBUICAO, soma
 import type { RespPasso } from "@/lib/tipos";
 import { usePassos } from "@/lib/usePassos";
 
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 const TEMPO = 15000;
 const CHAVE_LOCAL = "convite-rodada";
 
@@ -25,7 +26,7 @@ export type DadosRodada = {
 const dia = (iso: string) => iso.split("-").reverse().join("/");
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 const grupoDe = (c: CenarioSnap) => (c.modulos.length > 1 ? `Fluxo entre módulos: ${c.modulos.join(" → ")}` : c.modulos[0] ? `Módulo ${c.modulos[0]}` : "Sem módulo indicado");
-const COR_ESTADO_ATRIB = { sem_resposta: "bg-white text-slate-800 ring-slate-400", em_andamento: "bg-amber-100 text-amber-950 ring-amber-300", enviado: "bg-indigo-100 text-indigo-900 ring-indigo-300" } as const;
+const COR_ESTADO_ATRIB = { sem_resposta: "bg-white text-slate-800 ring-slate-400", em_andamento: "bg-amber-100 text-amber-950 ring-amber-300", enviado: "bg-brand-100 text-brand-900 ring-brand-300" } as const;
 
 // Página de quem valida: entra pelo convite (#k=...), guarda o convite neste aparelho e busca SÓ os testes atribuídos a essa pessoa
 export default function MeusTestesAoVivo() {
@@ -196,7 +197,8 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-4">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-indigo-800">Meus testes · {dados.rodada.sistema}</p>
+          <Logo tamanho="size-6" className="mb-2 text-sm" />
+          <p className="text-sm font-medium text-brand-800">Meus testes · {dados.rodada.sistema}</p>
           <h1 className="break-words text-xl font-semibold sm:text-2xl">{dados.rodada.nome} <span className="text-base font-normal text-slate-700">versão {dados.rodada.versao}</span></h1>
         </div>
         <div className="text-xs text-slate-700">
@@ -210,7 +212,7 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
   const aviso = (
     <div className="space-y-3">
       {dados.aprovada && <p role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950"><strong>Rodada aprovada.</strong> {dados.aprovada.mensagem}</p>}
-      {previa && <p role="status" className="rounded-lg border border-violet-300 bg-violet-50 px-4 py-3 text-sm text-violet-950"><strong>Prévia como validador.</strong> É assim que {dados.validador.nome} vai ver. Nada é salvo nem enviado aqui.</p>}
+      {previa && <p role="status" className="rounded-lg border border-brand-300 bg-brand-50 px-4 py-3 text-sm text-brand-950"><strong>Prévia como validador.</strong> É assim que {dados.validador.nome} vai ver. Nada é salvo nem enviado aqui.</p>}
       {ps.bloqueio && <p role="alert" className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950"><strong>{ps.bloqueio}</strong> Recarregue a página para continuar.</p>}
       {ps.falhas > 0 && !ps.bloqueio && (
         <div role="alert" className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950">
@@ -343,15 +345,15 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
           {!todosEnviados && (
             <div className="mt-5 flex flex-wrap items-center gap-3">
               {!confirmando ? (
-                <button type="button" disabled={previa || idsPendentes.length > 0 || ocupado || !!dados.aprovada} onClick={() => setConfirmando(true)} className={`min-h-12 rounded-md bg-indigo-600 px-6 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 ${FOCO}`}>
+                <button type="button" disabled={previa || idsPendentes.length > 0 || ocupado || !!dados.aprovada} onClick={() => setConfirmando(true)} className={`min-h-12 rounded-md bg-brand-600 px-6 text-base font-semibold text-white hover:bg-brand-700 disabled:opacity-50 ${FOCO}`}>
                   {ocupado ? "Aguarde: salvando…" : "Enviar meus resultados"}
                 </button>
               ) : (
-                <div role="alertdialog" aria-label="Confirmar envio" className="w-full rounded-lg border border-indigo-300 bg-indigo-50 p-4 text-sm text-indigo-950">
+                <div role="alertdialog" aria-label="Confirmar envio" className="w-full rounded-lg border border-brand-300 bg-brand-50 p-4 text-sm text-brand-950">
                   <p className="font-semibold">Enviar agora?</p>
                   <p className="mt-1">Depois de enviar, você não muda mais as respostas. {geral.diferente + geral.bloqueado > 0 ? `Serão enviados ${plural(geral.diferente, "passo que deu diferente", "passos que deram diferente")} e ${plural(geral.bloqueado, "bloqueado", "bloqueados")}.` : "Tudo funcionou."}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" disabled={envio.fase === "enviando"} onClick={enviar} className={`min-h-11 rounded-md bg-indigo-600 px-5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60 ${FOCO}`}>{envio.fase === "enviando" ? "Enviando…" : "Sim, enviar"}</button>
+                    <button type="button" disabled={envio.fase === "enviando"} onClick={enviar} className={`min-h-11 rounded-md bg-brand-600 px-5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60 ${FOCO}`}>{envio.fase === "enviando" ? "Enviando…" : "Sim, enviar"}</button>
                     <button type="button" onClick={() => setConfirmando(false)} className={`min-h-11 rounded-md border border-slate-400 bg-white px-5 text-sm font-medium ${FOCO}`}>Voltar</button>
                   </div>
                 </div>
@@ -359,7 +361,7 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
               {idsPendentes.length > 0 && <p className="text-sm text-slate-700">Responda os passos pendentes para liberar o envio.</p>}
             </div>
           )}
-          <p className="mt-6"><button type="button" onClick={() => setVista({ t: "inicio" })} className={`min-h-11 rounded text-sm font-medium text-indigo-800 underline ${FOCO}`}>Voltar ao início</button></p>
+          <p className="mt-6"><button type="button" onClick={() => setVista({ t: "inicio" })} className={`min-h-11 rounded text-sm font-medium text-brand-800 underline ${FOCO}`}>Voltar ao início</button></p>
         </main>
       </div>
     );
@@ -386,16 +388,16 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
         {dados.validador.nota && <p className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"><strong>Orientação para você:</strong> {dados.validador.nota}</p>}
 
         {retestesAbertos.length > 0 && (
-          <section aria-labelledby="t-retestes" className="mt-5 rounded-lg border-2 border-violet-400 bg-violet-50 p-4">
-            <h3 id="t-retestes" className="text-lg font-semibold text-violet-950">Retestes pendentes ({retestesAbertos.length})</h3>
-            <p className="mt-1 text-sm text-violet-950">A equipe corrigiu o que você relatou e pediu para conferir de novo.</p>
+          <section aria-labelledby="t-retestes" className="mt-5 rounded-lg border-2 border-brand-400 bg-brand-50 p-4">
+            <h3 id="t-retestes" className="text-lg font-semibold text-brand-950">Retestes pendentes ({retestesAbertos.length})</h3>
+            <p className="mt-1 text-sm text-brand-950">A equipe corrigiu o que você relatou e pediu para conferir de novo.</p>
             <ul className="mt-3 space-y-2">
               {retestesAbertos.map((t) => (
-                <li key={t.id} className="rounded-md border border-violet-200 bg-white p-3 text-sm">
+                <li key={t.id} className="rounded-md border border-brand-200 bg-white p-3 text-sm">
                   <p className="font-semibold">{t.cenario.titulo} <span className="font-normal text-slate-700">· reteste {t.numero} · versão {t.versao}</span></p>
                   <p className="mt-1 whitespace-pre-wrap text-slate-800"><span className="font-medium">Corrigido:</span> {t.corrigido}</p>
                   <p className="text-xs text-slate-700">{plural(t.passos.length, "passo para refazer", "passos para refazer")} · pedido por {t.solicitadoPor}</p>
-                  <button type="button" onClick={() => setVista({ t: "reteste", id: t.id })} className={`mt-2 min-h-11 rounded-md bg-violet-700 px-5 text-sm font-semibold text-white hover:bg-violet-800 ${FOCO}`}>
+                  <button type="button" onClick={() => setVista({ t: "reteste", id: t.id })} className={`mt-2 min-h-11 rounded-md bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800 ${FOCO}`}>
                     {t.passos.some((p) => respRt[p.id]) ? "Continuar reteste" : "Começar reteste"}<span className="sr-only"> de {t.cenario.titulo}</span>
                   </button>
                 </li>
@@ -404,25 +406,25 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
           </section>
         )}
 
-        <div className="mt-5 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-          <p className="text-sm text-indigo-950">
+        <div className="mt-5 rounded-lg border border-brand-200 bg-brand-50 p-4">
+          <p className="text-sm text-brand-950">
             {todosEnviados ? "Você já enviou todos os seus resultados." : iniciou ? `Você respondeu ${geral.respondidos} de ${geral.total} passos. Suas respostas são salvas sozinhas.` : `${plural(dados.atribuicoes.length, "teste atribuído", "testes atribuídos")} a você, com ${plural(geral.total, "passo", "passos")} no total.`}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             {todosEnviados ? (
-              <button type="button" onClick={() => setVista({ t: "resumo" })} className={`min-h-12 rounded-md bg-indigo-600 px-6 text-base font-semibold text-white hover:bg-indigo-700 ${FOCO}`}>Consultar o que enviei</button>
+              <button type="button" onClick={() => setVista({ t: "resumo" })} className={`min-h-12 rounded-md bg-brand-600 px-6 text-base font-semibold text-white hover:bg-brand-700 ${FOCO}`}>Consultar o que enviei</button>
             ) : (
-              <button type="button" disabled={!fila.length} onClick={() => irPara(primeiroPendente())} className={`min-h-12 rounded-md bg-indigo-600 px-6 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 ${FOCO}`}>
+              <button type="button" disabled={!fila.length} onClick={() => irPara(primeiroPendente())} className={`min-h-12 rounded-md bg-brand-600 px-6 text-base font-semibold text-white hover:bg-brand-700 disabled:opacity-50 ${FOCO}`}>
                 {iniciou ? "Continuar de onde parei" : "Começar meus testes"}
               </button>
             )}
             {dados.rodada.ambienteUrl && (
-              <a href={dados.rodada.ambienteUrl} target="_blank" rel="noreferrer" className={`inline-flex min-h-12 items-center rounded-md border border-indigo-700 bg-white px-5 text-base font-medium text-indigo-900 hover:bg-indigo-100 ${FOCO}`}>
+              <a href={dados.rodada.ambienteUrl} target="_blank" rel="noreferrer" className={`inline-flex min-h-12 items-center rounded-md border border-brand-700 bg-white px-5 text-base font-medium text-brand-900 hover:bg-brand-100 ${FOCO}`}>
                 Abrir ambiente de teste<span className="sr-only"> (abre em nova aba)</span>
               </a>
             )}
           </div>
-          {dados.rodada.ambienteUrl && <p className="mt-2 text-xs text-indigo-950">O ambiente de teste abre em outra aba. Volte aqui para responder.</p>}
+          {dados.rodada.ambienteUrl && <p className="mt-2 text-xs text-brand-950">O ambiente de teste abre em outra aba. Volte aqui para responder.</p>}
         </div>
 
         {dados.atribuicoes.length === 0 ? (
@@ -473,7 +475,7 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
               </section>
             )}
             <div className="mt-6 border-t border-slate-200 pt-4">
-              <button type="button" onClick={() => setVista({ t: "resumo" })} className={`min-h-11 rounded-md border border-indigo-700 bg-white px-5 text-sm font-semibold text-indigo-900 hover:bg-indigo-50 ${FOCO}`}>
+              <button type="button" onClick={() => setVista({ t: "resumo" })} className={`min-h-11 rounded-md border border-brand-700 bg-white px-5 text-sm font-semibold text-brand-900 hover:bg-brand-50 ${FOCO}`}>
                 {todosEnviados ? "Ver resumo" : "Enviar meus resultados"}
               </button>
               <p className="mt-1 text-xs text-slate-700">Você ainda confere o resumo antes de enviar.</p>

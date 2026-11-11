@@ -40,7 +40,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   return (
     <>
       <main className="mx-auto max-w-3xl px-4 py-8">
-        <Link href={`/admin/${id}/biblioteca`} className="text-sm text-indigo-800 hover:underline">← Biblioteca de testes</Link>
+        <Link href={`/admin/${id}/biblioteca`} className="text-sm text-brand-800 hover:underline">← Biblioteca de testes</Link>
         <h1 className="mt-2 text-2xl font-semibold">{nova ? "Novo cenário" : "Editar cenário"}</h1>
         {situacao === "arquivado" && <p className="mt-2 rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-800">Este cenário está arquivado. Ele não aparece na lista padrão. Para reativar, use o filtro “Arquivados” na biblioteca.</p>}
         <div className="mt-5">

@@ -8,7 +8,7 @@ import { acessoDaTela } from "@/lib/acesso";
 import { estadoPasso, passoCompleto, ROTULO_PASSO, RESULTADOS_PASSO, type EstadoPasso } from "@/lib/passos";
 import { type Item, type Modulo, type Passo, type RespPasso, type ResultadoPasso, type Tela } from "@/lib/tipos";
 
-const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 const MAX_PRINTS = 10;
 const TIPOS_IMAGEM = ["image/png", "image/jpeg", "image/webp"];
 
@@ -198,14 +198,14 @@ export default function Execucao({ atual, fila, posicao, resp, somenteLeitura, p
       </div>
 
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Passos respondidos no caderno" aria-valuemin={0} aria-valuemax={fila.length} aria-valuenow={respondidos}>
-        <div className="h-full bg-indigo-600 transition-[width] motion-reduce:transition-none" style={{ width: `${fila.length ? (respondidos / fila.length) * 100 : 0}%` }} />
+        <div className="h-full bg-brand-600 transition-[width] motion-reduce:transition-none" style={{ width: `${fila.length ? (respondidos / fila.length) * 100 : 0}%` }} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {acesso.tipo === "link" && (
           <>
             <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900 ring-1 ring-inset ring-emerald-300">Tela programada: teste de verdade</span>
-            <a href={acesso.url} target="_blank" rel="noreferrer" className={`inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>
+            <a href={acesso.url} target="_blank" rel="noreferrer" className={`inline-flex min-h-11 items-center rounded-md bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 ${FOCO}`}>
               Abrir a tela para testar<span className="sr-only"> (abre em nova aba)</span>
             </a>
           </>
@@ -214,7 +214,7 @@ export default function Execucao({ atual, fila, posicao, resp, somenteLeitura, p
           <>
             <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900 ring-1 ring-inset ring-emerald-300">Teste de verdade: abra pelo menu</span>
             {acesso.url && (
-              <a href={acesso.url} target="_blank" rel="noreferrer" className={`inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>
+              <a href={acesso.url} target="_blank" rel="noreferrer" className={`inline-flex min-h-11 items-center rounded-md bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 ${FOCO}`}>
                 Abrir o ambiente de teste<span className="sr-only"> (abre em nova aba)</span>
               </a>
             )}
@@ -222,7 +222,7 @@ export default function Execucao({ atual, fila, posicao, resp, somenteLeitura, p
           </>
         )}
         {acesso.tipo === "desenho" && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800 ring-1 ring-inset ring-slate-300">Só desenho: confira pela imagem, não há tela para abrir</span>}
-        {acesso.tipo === "pop-up" && <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-950 ring-1 ring-inset ring-violet-300">Pop-up de “{atual.paiTitulo}”: abre dentro dessa tela, como o passo explica</span>}
+        {acesso.tipo === "pop-up" && <span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-semibold text-brand-950 ring-1 ring-inset ring-brand-300">Pop-up de “{atual.paiTitulo}”: abre dentro dessa tela, como o passo explica</span>}
         {acesso.tipo === "incompleto" && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-950 ring-1 ring-inset ring-amber-400">Quem preparou ainda não explicou como abrir esta tela. Avise a equipe.</span>}
         {tela.pdf && (
           <a href={tela.pdf} target="_blank" rel="noreferrer" className={`inline-flex min-h-11 items-center rounded-md border border-slate-400 bg-white px-4 text-sm font-medium hover:bg-slate-50 ${FOCO}`}>
@@ -243,7 +243,7 @@ export default function Execucao({ atual, fila, posicao, resp, somenteLeitura, p
                 aoIr={aoIr}
                 ariaCurrent={aqui}
                 ariaLabel={`Passo ${s.indice}: ${ROTULO_ESTADO[e]}`}
-                className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md border px-3 text-sm font-semibold tabular-nums ${FOCO} ${aqui ? "border-indigo-700 bg-indigo-700 text-white" : "border-slate-400 bg-white hover:bg-slate-50"}`}
+                className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md border px-3 text-sm font-semibold tabular-nums ${FOCO} ${aqui ? "border-brand-700 bg-brand-700 text-white" : "border-slate-400 bg-white hover:bg-slate-50"}`}
               >
                 {s.indice}
                 {!aqui && <Icone estado={e} />}
@@ -257,14 +257,14 @@ export default function Execucao({ atual, fila, posicao, resp, somenteLeitura, p
         {/* instrução e resultado esperado, com a imagem por perto */}
         <div className="space-y-4">
           {atual.perfil && (
-            <section aria-label="Perfil de acesso" className="rounded-lg border border-violet-300 bg-violet-50 p-3 text-sm text-violet-950">
+            <section aria-label="Perfil de acesso" className="rounded-lg border border-brand-300 bg-brand-50 p-3 text-sm text-brand-950">
               <p><strong>Perfil de acesso para este passo:</strong> {atual.perfil}</p>
               {atual.perfilAnterior && atual.perfilAnterior !== atual.perfil && <p className="mt-1 font-semibold">Troque de perfil: no passo anterior era {atual.perfilAnterior}. Entre no sistema de teste com a conta ou função {atual.perfil}.</p>}
               <p className="mt-1 text-xs">Perfil é a conta ou função usada no sistema em teste. Se não tiver a conta, avise quem preparou a rodada. Nunca escreva senhas aqui.</p>
             </section>
           )}
           <section aria-labelledby="t-fazer" className="rounded-lg border border-slate-300 bg-white p-4">
-            <h3 id="t-fazer" className="text-sm font-semibold uppercase tracking-wide text-indigo-900">O que fazer</h3>
+            <h3 id="t-fazer" className="text-sm font-semibold uppercase tracking-wide text-brand-900">O que fazer</h3>
             <p className="mt-2 whitespace-pre-wrap text-base">{passo.fazer}</p>
           </section>
           <section aria-labelledby="t-esperado" className="rounded-lg border border-emerald-300 bg-emerald-50 p-4">
@@ -323,7 +323,7 @@ export default function Execucao({ atual, fila, posicao, resp, somenteLeitura, p
                   {RESULTADOS_PASSO.map((v) => (
                     <label
                       key={v}
-                      className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-md border px-3 py-2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-indigo-600 ${r?.resultado === v ? ATIVO[v] : "border-slate-400 bg-white hover:bg-slate-50"}`}
+                      className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-md border px-3 py-2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-600 ${r?.resultado === v ? ATIVO[v] : "border-slate-400 bg-white hover:bg-slate-50"}`}
                     >
                       <input type="radio" name={`res-${passo.id}`} className="sr-only" checked={r?.resultado === v} onChange={() => { aoMudar(item.id, passo.id, { resultado: v }); setOkAnexo(""); }} />
                       <span className="mt-0.5 text-slate-800"><Icone estado={v === "funcionou" ? "funcionou" : v === "diferente" ? "diferente" : "bloqueado"} /></span>
@@ -352,7 +352,7 @@ export default function Execucao({ atual, fila, posicao, resp, somenteLeitura, p
                     onChange={(e) => aoMudar(item.id, passo.id, { obs: e.target.value })}
                     onPaste={r.resultado !== "funcionou" ? aoColar : undefined}
                     placeholder={r.resultado === "diferente" ? "Ex.: ao clicar em Salvar apareceu um erro vermelho e o cadastro não foi criado" : r.resultado === "nao_consegui" ? "Ex.: o botão Novo cadastro não aparece para o meu usuário" : "Ex.: tudo certo, só achei o texto do botão pequeno"}
-                    className="field-sizing-content mt-2 min-h-24 w-full resize-y rounded-md border border-slate-500 px-3 py-2 text-base focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 sm:text-sm"
+                    className="field-sizing-content mt-2 min-h-24 w-full resize-y rounded-md border border-slate-500 px-3 py-2 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600 sm:text-sm"
                   />
                   <div id={`ajuda-${passo.id}`} className="mt-1 text-sm">
                     {faltaTexto && <p className="text-rose-800">{r.resultado === "diferente" ? "Descreva o que aconteceu para a equipe conseguir corrigir. Enquanto estiver vazio, o passo não conta como respondido." : "Escreva o motivo. Enquanto estiver vazio, o passo não conta como respondido."}</p>}
@@ -362,7 +362,7 @@ export default function Execucao({ atual, fila, posicao, resp, somenteLeitura, p
                     <div className="mt-3">
                       {r.anexos.length < MAX_PRINTS ? (
                         <div>
-                          <label className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-slate-400 bg-white px-3 text-sm font-medium hover:bg-slate-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-indigo-600">
+                          <label className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-slate-400 bg-white px-3 text-sm font-medium hover:bg-slate-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-600">
                             Anexar print
                             <input type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" onChange={(e) => { if (e.target.files?.length) void anexar(Array.from(e.target.files)); e.target.value = ""; }} />
                           </label>
@@ -393,13 +393,13 @@ export default function Execucao({ atual, fila, posicao, resp, somenteLeitura, p
             <span aria-hidden="true">← </span>Passo anterior
           </LinkTela>
         ) : <span />}
-        {!previa && <button type="button" onClick={aoSair} className={`min-h-11 rounded-md px-3 text-sm font-medium text-indigo-800 underline ${FOCO}`}>Sair do teste (o que você fez fica salvo)</button>}
+        {!previa && <button type="button" onClick={aoSair} className={`min-h-11 rounded-md px-3 text-sm font-medium text-brand-800 underline ${FOCO}`}>Sair do teste (o que você fez fica salvo)</button>}
         {proximo ? (
-          <LinkTela id={idPasso(proximo.passo.id)} aoIr={aoIr} className={`inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>
+          <LinkTela id={idPasso(proximo.passo.id)} aoIr={aoIr} className={`inline-flex min-h-11 items-center rounded-md bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 ${FOCO}`}>
             {proximo.item.id === item.id ? "Próximo passo" : `Próximo ${rotuloItem.toLowerCase()}`}<span aria-hidden="true"> →</span>
           </LinkTela>
         ) : previa ? <span /> : (
-          <button type="button" onClick={aoSair} className={`min-h-11 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 ${FOCO}`}>Terminar e ver o resumo</button>
+          <button type="button" onClick={aoSair} className={`min-h-11 rounded-md bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 ${FOCO}`}>Terminar e ver o resumo</button>
         )}
       </nav>
     </div>

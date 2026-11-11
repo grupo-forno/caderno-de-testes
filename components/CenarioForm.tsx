@@ -56,7 +56,7 @@ export default function CenarioForm({ acao, inicial, telas, perfis, erro, textoA
   return (
     <form action={acao} className="space-y-8">
       {inicial.origemItem && <input type="hidden" name="origem_item" value={inicial.origemItem} />}
-      {textoAviso && <p role="status" className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-950">{textoAviso}</p>}
+      {textoAviso && <p role="status" className="rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-950">{textoAviso}</p>}
       {erro && MENSAGEM_ERRO[erro] && <p role="alert" className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-950">{MENSAGEM_ERRO[erro]}</p>}
 
       <section aria-labelledby="t-dados" className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
