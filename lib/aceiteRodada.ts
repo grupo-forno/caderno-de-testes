@@ -46,6 +46,7 @@ export type ResumoAceite = {
   impedimentos: { texto: string; ref: Ref | null }[]; // por que a aprovação sem ressalvas não está disponível
   podeAprovar: boolean;
   builds: string[]; // versões ou builds conferidos em reteste
+  falhasPorSituacao: { aguardandoCorrecao: number; aguardandoReteste: number }; // falhas ainda abertas: precisam de ajuste ou esperam o reteste
 };
 
 const ordem: Estado[] = ["comFalhas", "bloqueadas", "rascunho", "semResposta", "concluidas"];
@@ -56,6 +57,7 @@ export function avaliarAceite(atribs: EntradaAtribuicao[], pends: EntradaPendenc
     porAtribuicao: vazio(), porCenario: vazio(),
     porPasso: { total: 0, funcionou: 0, falhasResolvidas: 0, falhasAbertas: 0, bloqueados: 0, semResposta: 0 },
     pendenciasAbertas: [], retestesEmAndamento: [], falhasResolvidas: [], bloqueios: [], lacunas: [], ressalvas: [], impedimentos: [], podeAprovar: false, builds: [],
+    falhasPorSituacao: { aguardandoCorrecao: 0, aguardandoReteste: 0 },
   };
   const estadoDoCenario = new Map<string, Estado[]>();
 
@@ -78,6 +80,9 @@ export function avaliarAceite(atribs: EntradaAtribuicao[], pends: EntradaPendenc
         } else {
           falhas++;
           r.porPasso.falhasAbertas++;
+          // sem pendência registrada (não deveria acontecer) conta como falha esperando correção
+          if (pd?.situacao === "aguardando_reteste") r.falhasPorSituacao.aguardandoReteste++;
+          else r.falhasPorSituacao.aguardandoCorrecao++;
           if (pd) {
             const item = { titulo, detalhe: `${a.validador}. Situação: ${pd.situacao === "aberta" ? "Aberta" : pd.situacao === "em_correcao" ? "Em correção" : "Aguardando reteste"}.`, ref: { tipo: "pendencia", id: pd.id } as Ref };
             r.pendenciasAbertas.push(item);
@@ -162,3 +167,44 @@ export function situacaoDoAceite(ultimo: { tipo: string } | undefined): Situacao
   return "reaberta";
 }
 export const ROTULO_SITUACAO_ACEITE: Record<SituacaoAceite, string> = { aguardando: "Aguardando decisão", aprovada: "Aprovada", correcoes: "Correções solicitadas", reaberta: "Reaberta, aguardando nova decisão" };
+
+// Situação da rodada publicada, calculada do que existe agora: respostas, pendências e retestes.
+// Quem decide a aprovação continua sendo uma pessoa (o aceite). Aqui só se diz em que ponto a rodada está e qual é o próximo passo.
+export type TomSituacao = "neutro" | "info" | "alerta" | "erro" | "sucesso";
+export type SituacaoDaRodada = {
+  chave: "em_validacao" | "correcoes" | "reteste" | "bloqueios" | "pronta" | "aprovada";
+  rotulo: string;
+  detalhe: string;
+  tom: TomSituacao;
+  proximo: "pendencias" | "aceite" | null;
+};
+
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+
+export function situacaoDaRodada(resumo: ResumoAceite, aceite: SituacaoAceite): SituacaoDaRodada {
+  if (aceite === "aprovada") return { chave: "aprovada", rotulo: "Aprovada", detalhe: "A entrega foi aprovada e as respostas estão só para leitura.", tom: "sucesso", proximo: "aceite" };
+  const enviados = resumo.porAtribuicao.concluidas + resumo.porAtribuicao.comFalhas + resumo.porAtribuicao.bloqueadas;
+  if (resumo.lacunas.length > 0) {
+    return { chave: "em_validacao", rotulo: "Em validação", detalhe: `${enviados} de ${resumo.porAtribuicao.total} testes enviados. Falta o envio dos outros.`, tom: "info", proximo: null };
+  }
+  const f = resumo.falhasPorSituacao;
+  if (f.aguardandoCorrecao > 0) {
+    return { chave: "correcoes", rotulo: "Correções pendentes", detalhe: `${plural(f.aguardandoCorrecao, "falha espera", "falhas esperam")} a correção da equipe${f.aguardandoReteste ? ` e ${plural(f.aguardandoReteste, "espera", "esperam")} o reteste` : ""}.`, tom: "erro", proximo: "pendencias" };
+  }
+  if (f.aguardandoReteste > 0) {
+    return { chave: "reteste", rotulo: "Aguardando reteste", detalhe: `${plural(f.aguardandoReteste, "correção espera", "correções esperam")} a confirmação do validador.`, tom: "info", proximo: "pendencias" };
+  }
+  if (resumo.bloqueios.length > 0) {
+    return { chave: "bloqueios", rotulo: "Com passos bloqueados", detalhe: `${plural(resumo.bloqueios.length, "passo não pôde", "passos não puderam")} ser testado${resumo.bloqueios.length === 1 ? "" : "s"}. Resolva o impedimento e peça o reteste.`, tom: "alerta", proximo: "pendencias" };
+  }
+  const corrigidas = resumo.porPasso.falhasResolvidas;
+  return { chave: "pronta", rotulo: "Tudo OK: pronta para aprovar", detalhe: corrigidas ? `Todos os testes foram enviados e ${plural(corrigidas, "falha foi corrigida", "falhas foram corrigidas")} e confirmada${corrigidas === 1 ? "" : "s"} no reteste. Falta só a decisão de aprovar.` : "Todos os testes foram enviados e deram certo. Falta só a decisão de aprovar.", tom: "sucesso", proximo: "aceite" };
+}
+
+export const COR_TOM: Record<TomSituacao, string> = {
+  neutro: "bg-slate-100 text-slate-900 ring-slate-300",
+  info: "bg-brand-100 text-brand-950 ring-brand-300",
+  alerta: "bg-amber-100 text-amber-950 ring-amber-400",
+  erro: "bg-rose-100 text-rose-950 ring-rose-300",
+  sucesso: "bg-emerald-100 text-emerald-950 ring-emerald-300",
+};

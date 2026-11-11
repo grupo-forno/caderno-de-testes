@@ -7,6 +7,8 @@ import { exigirAdmin } from "@/lib/admin";
 import BancoDesatualizado from "@/components/BancoDesatualizado";
 import { sql, tabelasFaltando } from "@/lib/db";
 import { ROTULO_SITUACAO } from "@/lib/rodadas";
+import { carregarAceite } from "@/lib/aceiteRodadaDb";
+import { COR_TOM, situacaoDaRodada } from "@/lib/aceiteRodada";
 import { progressoDaRodada } from "@/lib/rodadasDb";
 import { criarRodada, excluirRodada } from "../../rodada-actions";
 
@@ -27,6 +29,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   if (faltando.length) return <BancoDesatualizado cadernoId={id} pagina="As Rodadas" faltando={faltando} />;
   const rodadas = await sql`select id, nome, versao, prazo::text as prazo, situacao, publicada_em from rodadas where caderno_id = ${id} order by criado desc`;
   const progressos = await Promise.all(rodadas.map((r) => (r.situacao === "em_validacao" ? progressoDaRodada(r.id) : null)));
+  const vivas = await Promise.all(rodadas.map((r) => (r.situacao === "em_validacao" ? carregarAceite(r.id).then((x) => situacaoDaRodada(x.resumo, x.situacao)) : null)));
 
   return (
     <>
@@ -50,6 +53,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
           <ul className="mt-4 space-y-3">
             {rodadas.map((r, i) => {
               const p = progressos[i];
+              const viva = vivas[i];
               const pct = p && p.geral.total ? Math.round((p.geral.respondidos / p.geral.total) * 100) : 0;
               return (
                 <li key={r.id} className="rounded-lg border border-slate-200 bg-white p-4">
@@ -58,7 +62,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                       <Link href={`/admin/${id}/rodadas/${r.id}`} className={`rounded text-brand-900 hover:underline ${FOCO}`}>{r.nome}</Link>
                       <span className="ml-2 text-sm font-normal text-slate-700">versão {r.versao}</span>
                     </h2>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${r.situacao === "rascunho" ? "bg-slate-100 text-slate-800 ring-slate-300" : "bg-brand-100 text-brand-900 ring-brand-300"}`}>{ROTULO_SITUACAO[r.situacao as "rascunho" | "em_validacao"]}</span>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${viva ? COR_TOM[viva.tom] : "bg-slate-100 text-slate-800 ring-slate-300"}`}>{viva ? viva.rotulo : ROTULO_SITUACAO[r.situacao as "rascunho" | "em_validacao"]}</span>
                   </div>
                   <p className="mt-1 text-sm text-slate-700">Prazo: {dia(r.prazo)}</p>
                   {p ? (

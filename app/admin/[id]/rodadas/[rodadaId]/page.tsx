@@ -12,6 +12,8 @@ import { contextoDoCenario, ROTULO_TIPO, type PassoCenario } from "@/lib/cenario
 import { tokenDoValidador } from "@/lib/convite";
 import { sql } from "@/lib/db";
 import { dataHora } from "@/lib/formatar";
+import { carregarAceite } from "@/lib/aceiteRodadaDb";
+import { COR_TOM, situacaoDaRodada } from "@/lib/aceiteRodada";
 import { conferirPublicacao, ROTULO_ESTADO_ATRIBUICAO, ROTULO_SITUACAO, somar } from "@/lib/rodadas";
 import { acompanhar } from "@/lib/rodadasDb";
 import { adicionarValidador, novaRodadaAPartirDe, novoLinkDeConvite, publicarRodada, removerValidador, salvarAtribuicoes, salvarCenariosDaRodada, salvarDadosRodada } from "../../../rodada-actions";
@@ -49,12 +51,15 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
   const erro = typeof sp.erro === "string" ? ERROS[sp.erro] : null;
   const aqui = `/admin/${id}/rodadas/${rodadaId}`;
 
+  // rodada publicada: a situação vem do que existe agora (respostas, pendências e retestes), não só de "publicada"
+  const viva = r.situacao === "em_validacao" ? await carregarAceite(rodadaId).then((x) => ({ ...x, sit: situacaoDaRodada(x.resumo, x.situacao) })) : null;
+
   const topo = (
     <>
       <Link href={`/admin/${id}/rodadas`} className="text-sm text-brand-800 hover:underline">← Rodadas</Link>
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <h1 className="min-w-0 break-words text-2xl font-semibold">{r.nome}</h1>
-        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${r.situacao === "rascunho" ? "bg-slate-100 text-slate-800 ring-slate-300" : "bg-brand-100 text-brand-900 ring-brand-300"}`}>{ROTULO_SITUACAO[r.situacao as "rascunho" | "em_validacao"]}</span>
+        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${viva ? COR_TOM[viva.sit.tom] : "bg-slate-100 text-slate-800 ring-slate-300"}`}>{viva ? viva.sit.rotulo : ROTULO_SITUACAO[r.situacao as "rascunho" | "em_validacao"]}</span>
       </div>
       <p className="text-sm text-slate-700">{cad.titulo} · versão {r.versao}{r.publicada_em ? ` · publicada em ${dataHora(r.publicada_em)}` : ""}</p>
       {sp.salvo && <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">Salvo.</p>}
@@ -75,6 +80,14 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
         <main className="mx-auto max-w-4xl px-4 py-8">
           {topo}
           <AbasRodada cadernoId={id} rodadaId={rodadaId} ativa="geral" abertas={(await sql`select count(*)::int as n from pendencias where rodada_id = ${rodadaId} and situacao <> 'resolvida'`)[0].n} />
+          {viva && (
+            <section aria-labelledby="t-situacao" className={`mt-6 rounded-lg border p-5 ${viva.sit.tom === "sucesso" ? "border-emerald-300 bg-emerald-50" : viva.sit.tom === "erro" ? "border-rose-300 bg-rose-50" : viva.sit.tom === "alerta" ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
+              <h2 id="t-situacao" className="font-semibold">Situação da rodada: {viva.sit.rotulo}</h2>
+              <p className="mt-1 text-sm text-slate-800">{viva.sit.detalhe}</p>
+              {viva.sit.proximo === "pendencias" && <Link href={`${aqui}/pendencias`} className={btn + " mt-3 inline-flex min-h-11 items-center"}>Ver as pendências</Link>}
+              {viva.sit.proximo === "aceite" && <Link href={`${aqui}/aceite`} className={btn + " mt-3 inline-flex min-h-11 items-center"}>{viva.sit.chave === "aprovada" ? "Ver a aprovação" : "Aprovar a entrega"}</Link>}
+            </section>
+          )}
           {sp.novolink && <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">Novo link gerado. O anterior deixou de funcionar. Copie o link atualizado na lista de validadores.</p>}
 
           <section aria-labelledby="t-entrega" className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
@@ -103,7 +116,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
               ))}
             </ul>
             <ul className="mt-3 grid gap-3 sm:grid-cols-4" aria-label="Passos por resultado">
-              {([["Funcionou", geral.funcionou, "text-emerald-800"], ["Deu diferente", geral.diferente, "text-rose-800"], ["Bloqueado", geral.bloqueado, "text-amber-900"], ["Sem resposta", geral.semResposta, "text-slate-800"]] as const).map(([t, n, cor]) => (
+              {([[`Funcionou${a.atribuicoes.some((x) => x.corrigidos > 0) ? ` (${a.atribuicoes.reduce((s, x) => s + x.corrigidos, 0)} corrigidos no reteste)` : ""}`, geral.funcionou, "text-emerald-800"], ["Deu diferente", geral.diferente, "text-rose-800"], ["Bloqueado", geral.bloqueado, "text-amber-900"], ["Sem resposta", geral.semResposta, "text-slate-800"]] as const).map(([t, n, cor]) => (
                 <li key={t} className="rounded-lg border border-slate-200 p-3"><p className={`text-2xl font-semibold tabular-nums ${cor}`}>{n}</p><p className="text-sm">{t}</p></li>
               ))}
             </ul>

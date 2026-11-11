@@ -2,7 +2,7 @@ import { sql } from "@/lib/db";
 import { progresso, somar, type CenarioSnap, type Progresso } from "@/lib/rodadas";
 import type { RespPasso } from "@/lib/tipos";
 
-export type AtribAcomp = { id: string; rcId: string; validadorId: string; enviadoEm: string | null; prog: Progresso };
+export type AtribAcomp = { id: string; rcId: string; validadorId: string; enviadoEm: string | null; prog: Progresso; corrigidos: number };
 export type Falha = { atribuicao: string; validador: string; cenario: string; n: number; fazer: string; esperado: string; perfil: string; resultado: "diferente" | "nao_consegui"; obs: string; anexos: string[]; enviado: boolean; pendenciaId: string | null };
 
 // Acompanhamento de uma rodada publicada: progresso por pessoa, por cenário e as falhas/bloqueios com o contexto do passo.
@@ -12,7 +12,10 @@ export async function acompanhar(rodadaId: string) {
   const as = await sql`select a.id, a.rodada_cenario_id, a.validador_id, a.enviado_em from rodada_atribuicoes a join rodada_cenarios rc on rc.id = a.rodada_cenario_id where rc.rodada_id = ${rodadaId}`;
   const rs = await sql`select x.atribuicao_id, x.passo, x.resultado, x.obs, x.anexos from respostas_atribuicao x join rodada_atribuicoes a on a.id = x.atribuicao_id join rodada_cenarios rc on rc.id = a.rodada_cenario_id where rc.rodada_id = ${rodadaId}`;
 
-  const pend = new Map((await sql`select id, atribuicao_id, passo from pendencias where rodada_id = ${rodadaId}`).map((p) => [`${p.atribuicao_id}|${p.passo}`, p.id as string]));
+  const pends = await sql`select id, atribuicao_id, passo, situacao from pendencias where rodada_id = ${rodadaId}`;
+  const pend = new Map(pends.map((p) => [`${p.atribuicao_id}|${p.passo}`, p.id as string]));
+  // falha já corrigida e confirmada no reteste: vale como "funcionou" daqui para a frente
+  const resolvida = new Set(pends.filter((p) => p.situacao === "resolvida").map((p) => `${p.atribuicao_id}|${p.passo}`));
   const snap = new Map(rcs.map((r) => [r.id as string, r.snapshot as CenarioSnap | null]));
   const respDe = new Map<string, Record<string, RespPasso>>();
   for (const x of rs) {
@@ -26,8 +29,16 @@ export async function acompanhar(rodadaId: string) {
   for (const a of as) {
     const s = snap.get(a.rodada_cenario_id);
     if (!s) continue;
-    const resp = respDe.get(a.id) ?? {};
-    atribuicoes.push({ id: a.id, rcId: a.rodada_cenario_id, validadorId: a.validador_id, enviadoEm: a.enviado_em ? new Date(a.enviado_em).toISOString() : null, prog: progresso(s.passos.map((p) => p.id), resp, !!a.enviado_em) });
+    const bruta = respDe.get(a.id) ?? {};
+    const resp: Record<string, RespPasso> = { ...bruta };
+    let corrigidos = 0;
+    for (const p of s.passos) {
+      if (resolvida.has(`${a.id}|${p.id}`) && bruta[p.id] && bruta[p.id].resultado !== "funcionou") {
+        resp[p.id] = { ...bruta[p.id], resultado: "funcionou" };
+        corrigidos++;
+      }
+    }
+    atribuicoes.push({ id: a.id, rcId: a.rodada_cenario_id, validadorId: a.validador_id, enviadoEm: a.enviado_em ? new Date(a.enviado_em).toISOString() : null, prog: progresso(s.passos.map((p) => p.id), resp, !!a.enviado_em), corrigidos });
     s.passos.forEach((p, i) => {
       const r = resp[p.id];
       if (r && (r.resultado === "diferente" || r.resultado === "nao_consegui")) {

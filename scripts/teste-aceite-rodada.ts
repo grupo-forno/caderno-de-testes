@@ -1,7 +1,7 @@
 // Roda com: node scripts/teste-aceite-rodada.ts
 import assert from "node:assert/strict";
 // @ts-expect-error o node pede a extensão .ts; o tsc do projeto não
-import { avaliarAceite, impressao, montarRetrato, situacaoDoAceite, validarDecisao } from "../lib/aceiteRodada.ts";
+import { avaliarAceite, impressao, montarRetrato, situacaoDaRodada, situacaoDoAceite, validarDecisao } from "../lib/aceiteRodada.ts";
 
 const R = (resultado: string, obs = "") => ({ resultado, obs, anexos: [] }) as never;
 const atrib = (id: string, enviado: boolean, passos: Record<string, ReturnType<typeof R>>) => ({
@@ -81,5 +81,40 @@ assert.equal(situacaoDoAceite(undefined), "aguardando");
 assert.equal(situacaoDoAceite({ tipo: "aprovada_ressalvas" }), "aprovada");
 assert.equal(situacaoDoAceite({ tipo: "correcoes" }), "correcoes");
 assert.equal(situacaoDoAceite({ tipo: "reabertura" }), "reaberta");
+
+// ---- situação viva da rodada (o que aparece na lista e no topo da rodada)
+const pd = (id: string, passo: string, situacao: string, retesteAberto = false) => ({ id, atribuicaoId: "a1", passo, situacao, retesteAberto, build: null }) as never;
+
+// nem tudo foi enviado: em validação
+let sit = situacaoDaRodada(avaliarAceite([atrib("a1", true, { p1: R("funcionou") }), atrib("a2", false, { p1: R("funcionou") })], []), "aguardando");
+assert.equal(sit.chave, "em_validacao");
+
+// falha esperando correção: correções pendentes, e o próximo passo é a pendência
+sit = situacaoDaRodada(avaliarAceite([atrib("a1", true, { p1: R("diferente", "x"), p2: R("funcionou") })], [pd("pd1", "p1", "aberta")]), "aguardando");
+assert.equal(sit.chave, "correcoes");
+assert.equal(sit.proximo, "pendencias");
+
+// corrigido, só falta o validador refazer: aguardando reteste
+sit = situacaoDaRodada(avaliarAceite([atrib("a1", true, { p1: R("diferente", "x") })], [pd("pd1", "p1", "aguardando_reteste", true)]), "aguardando");
+assert.equal(sit.chave, "reteste");
+
+// reteste deu certo (pendência resolvida) e tudo foi enviado: tudo OK, pronta para aprovar
+sit = situacaoDaRodada(avaliarAceite([atrib("a1", true, { p1: R("diferente", "x"), p2: R("funcionou") })], [pd("pd1", "p1", "resolvida")]), "aguardando");
+assert.equal(sit.chave, "pronta");
+assert.equal(sit.tom, "sucesso");
+assert.equal(sit.proximo, "aceite");
+assert.match(sit.detalhe, /1 falha foi corrigida/);
+
+// uma falha corrigida e outra ainda aberta: continua com correções pendentes
+sit = situacaoDaRodada(avaliarAceite([atrib("a1", true, { p1: R("diferente", "x"), p2: R("diferente", "y") })], [pd("pd1", "p1", "resolvida"), pd("pd2", "p2", "em_correcao")]), "aguardando");
+assert.equal(sit.chave, "correcoes");
+
+// passo bloqueado sem falha: com passos bloqueados
+sit = situacaoDaRodada(avaliarAceite([atrib("a1", true, { p1: R("nao_consegui", "sem acesso") })], []), "aguardando");
+assert.equal(sit.chave, "bloqueios");
+
+// depois da aprovação: aprovada
+sit = situacaoDaRodada(avaliarAceite([atrib("a1", true, { p1: R("funcionou") })], []), "aprovada");
+assert.equal(sit.chave, "aprovada");
 
 console.log("aceite-rodada: tudo certo");
