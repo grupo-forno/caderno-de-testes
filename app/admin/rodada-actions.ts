@@ -36,8 +36,23 @@ export async function criarRodada(cadernoId: string) {
   await exigirAdmin();
   const [c] = ehUuid(cadernoId) ? await sql`select versao, ambiente_url from cadernos where id = ${cadernoId}` : [];
   if (!c) redirect("/admin");
+  // Clique repetido (a criação pode demorar): reaproveita o rascunho em branco criado há instantes em vez de fazer outro
+  const [recente] = await sql`
+    select r.id from rodadas r
+    where r.caderno_id = ${cadernoId} and r.situacao = 'rascunho' and r.nome = 'Nova rodada' and r.criado > now() - interval '30 seconds'
+      and not exists (select 1 from rodada_cenarios rc where rc.rodada_id = r.id)
+    order by r.criado desc limit 1`;
+  if (recente) redirect(`${base(cadernoId)}/${recente.id}`);
   const [r] = await sql`insert into rodadas (caderno_id, nome, versao, ambiente_url) values (${cadernoId}, 'Nova rodada', ${c.versao}, ${c.ambiente_url}) returning id`;
   redirect(`${base(cadernoId)}/${r.id}`);
+}
+
+// Só rascunho pode ser excluído: rodada publicada tem respostas e histórico dos validadores, que ficam guardados
+export async function excluirRodada(cadernoId: string, rodadaId: string) {
+  await exigirAdmin();
+  await rascunhoDe(cadernoId, rodadaId);
+  await sql`delete from rodadas where id = ${rodadaId} and caderno_id = ${cadernoId} and situacao = 'rascunho'`;
+  redirect(`${base(cadernoId)}?excluida=1`);
 }
 
 // Rascunho: todos os dados. Publicada: só o prazo e o endereço do ambiente (o resto ficou registrado na publicação).

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { btn } from "@/components/estilos";
+import BotaoEnviar from "@/components/BotaoEnviar";
+import { btn2 } from "@/components/estilos";
+import { Confirmar } from "@/components/ui";
 import { exigirAdmin } from "@/lib/admin";
 import BancoDesatualizado from "@/components/BancoDesatualizado";
 import { sql, tabelasFaltando } from "@/lib/db";
 import { ROTULO_SITUACAO } from "@/lib/rodadas";
 import { progressoDaRodada } from "@/lib/rodadasDb";
-import { criarRodada } from "../../rodada-actions";
+import { criarRodada, excluirRodada } from "../../rodada-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +34,10 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
         <Link href={`/admin/${id}`} className="text-sm text-indigo-800 hover:underline">← {cad.titulo}</Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold">Rodadas de homologação</h1>
-          <form action={criarRodada.bind(null, id)}><button className={btn + " min-h-11"}>Nova rodada</button></form>
+          <form action={criarRodada.bind(null, id)}><BotaoEnviar pendente="Criando…" className="min-h-11">Nova rodada</BotaoEnviar></form>
         </div>
         <p className="mt-1 text-sm text-slate-700">Cada rodada é uma entrega: você escolhe os cenários da biblioteca, atribui aos validadores e acompanha a execução.</p>
+        {sp.excluida && <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">Rodada excluída.</p>}
         {sp.erro === "rodada" && <p role="alert" className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">Essa rodada não existe mais. Confira a lista abaixo.</p>}
 
         {rodadas.length === 0 ? (
@@ -67,7 +70,12 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                       </p>
                     </>
                   ) : (
-                    <p className="mt-1 text-sm text-slate-700">Ainda em preparação: nada foi enviado aos validadores.</p>
+                    <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm text-slate-700">Ainda em preparação: nada foi enviado aos validadores.</p>
+                      <form action={excluirRodada.bind(null, id, r.id)}>
+                        <Confirmar texto={`Excluir a rodada “${r.nome}”? Ela ainda não foi publicada, então nada é perdido além do rascunho. Não dá para desfazer.`} className={btn2 + " min-h-11"}>Excluir<span className="sr-only"> {r.nome}</span></Confirmar>
+                      </form>
+                    </div>
                   )}
                 </li>
               );

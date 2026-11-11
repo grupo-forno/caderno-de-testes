@@ -80,12 +80,12 @@ export default function CenarioForm({ acao, inicial, telas, perfis, erro, textoA
           </div>
         </fieldset>
         <label className="block text-sm font-medium">
-          Tela principal (opcional)
+          Tela principal (opcional, só para teste de uma tela)
           <select name="tela_id" value={telaPrincipal} onChange={(e) => setTelaPrincipal(e.target.value)} className={campo + " min-h-11"}>
             <option value="">Nenhuma: cada passo indica a sua tela</option>
             {opcoes}
           </select>
-          <span className="mt-1 block text-xs font-normal text-slate-600">Para um cenário de uma tela só. Os passos que não indicarem outra tela usam esta.</span>
+          <span className="mt-1 block text-xs font-normal text-slate-600">Para um cenário de uma tela só. Para um fluxo com várias telas (ex.: escolher a área, depois cadastrar o celular), deixe em branco e escolha a tela em cada passo, mais abaixo.</span>
         </label>
         <label className="block text-sm font-medium">
           Pré-requisitos
@@ -99,7 +99,7 @@ export default function CenarioForm({ acao, inicial, telas, perfis, erro, textoA
 
       <section aria-labelledby="t-passos" className="rounded-lg border border-slate-200 bg-white p-5">
         <h2 id="t-passos" className="text-lg font-semibold">Passos</h2>
-        <p className="mt-1 text-sm text-slate-700">Na ordem em que acontecem. Quando o fluxo muda de tela ou de pessoa, indique a tela e o perfil do passo.</p>
+        <p className="mt-1 text-sm text-slate-700">Na ordem em que acontecem. Cada passo pode estar em uma tela diferente: quando o fluxo muda de tela ou de pessoa, indique a tela e o perfil dentro do passo (campo “Tela deste passo”).</p>
         <input type="hidden" name="passos" value={JSON.stringify(passos.map(({ id, fazer, esperado, telaId, perfil }) => ({ id, fazer, esperado, telaId, perfil })))} />
 
         {passos.length > 0 ? (
