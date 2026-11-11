@@ -1,12 +1,14 @@
 "use client";
 
+import { useFormStatus } from "react-dom";
 import { btn2, campo } from "@/components/estilos";
 
 
 // Botão que pede confirmação antes de enviar o formulário
 export function Confirmar({ texto, children, className = btn2 }: { texto: string; children: React.ReactNode; className?: string }) {
+  const { pending } = useFormStatus(); // enquanto o servidor trabalha, não deixa clicar de novo
   return (
-    <button className={className} onClick={(e) => { if (!confirm(texto)) e.preventDefault(); }}>
+    <button className={className + " disabled:opacity-60"} disabled={pending} aria-busy={pending} onClick={(e) => { if (!confirm(texto)) e.preventDefault(); }}>
       {children}
     </button>
   );

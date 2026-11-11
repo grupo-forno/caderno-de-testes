@@ -1,5 +1,6 @@
 "use client";
 
+import BotaoEnviar from "@/components/BotaoEnviar";
 import { useId, useState } from "react";
 import EditorPassos, { novoPassoEditavel, type PassoEditavel } from "@/components/EditorPassos";
 import { btn, campo } from "@/components/estilos";
@@ -139,7 +140,7 @@ export default function CenarioForm({ acao, inicial, telas, perfis, erro, textoA
         />
       </section>
 
-      <button className={btn + " min-h-11"}>Salvar cenário</button>
+      <BotaoEnviar variante="primario">Salvar cenário</BotaoEnviar>
     </form>
   );
 }

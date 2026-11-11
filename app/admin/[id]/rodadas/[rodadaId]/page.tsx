@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BotaoEnviar from "@/components/BotaoEnviar";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import AbasRodada from "@/components/AbasRodada";
@@ -87,7 +88,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
               <form action={salvarDadosRodada.bind(null, id, rodadaId)} className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2">
                 <label className="block text-sm font-medium">Endereço do ambiente<input name="ambiente_url" type="url" defaultValue={r.ambiente_url ?? ""} className={campo} /></label>
                 <label className="block text-sm font-medium">Prazo<input name="prazo" type="date" defaultValue={r.prazo_txt ?? ""} className={campo} /></label>
-                <div className="sm:col-span-2"><button className={btn2 + " min-h-11"}>Salvar</button></div>
+                <div className="sm:col-span-2"><BotaoEnviar variante="secundario">Salvar</BotaoEnviar></div>
               </form>
             </details>
           </section>
@@ -274,7 +275,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             <label className="block text-sm font-medium sm:col-span-2">Resumo do que mudou<textarea name="resumo" rows={3} defaultValue={r.resumo} className={campo + " field-sizing-content"} /></label>
             <label className="block text-sm font-medium sm:col-span-2">Instruções gerais<textarea name="instrucoes" rows={3} defaultValue={r.instrucoes} placeholder="Não escreva senhas aqui" className={campo + " field-sizing-content"} /></label>
             <label className="block text-sm font-medium sm:col-span-2">O que ficou fora do escopo<textarea name="fora_escopo" rows={2} defaultValue={r.fora_escopo} className={campo + " field-sizing-content"} /></label>
-            <div className="sm:col-span-2"><button className={btn + " min-h-11"}>Salvar dados</button></div>
+            <div className="sm:col-span-2"><BotaoEnviar variante="primario">Salvar dados</BotaoEnviar></div>
           </form>
         </section>
 
@@ -304,7 +305,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             <label className="block text-sm font-medium">Nome<input name="nome" required className={campo} /></label>
             <label className="block text-sm font-medium">E-mail<input name="email" type="email" required className={campo} /></label>
             <label className="block text-sm font-medium sm:col-span-2">Orientação para esta pessoa (opcional)<input name="nota" maxLength={1000} placeholder="Ex.: use as contas de teste que enviamos por outro canal. Sem senhas aqui" className={campo} /></label>
-            <div className="sm:col-span-2"><button className={btn2 + " min-h-11"}>Adicionar validador</button></div>
+            <div className="sm:col-span-2"><BotaoEnviar variante="secundario">Adicionar validador</BotaoEnviar></div>
           </form>
 
           <h3 className="mt-6 font-semibold">Quem executa cada cenário</h3>
@@ -332,7 +333,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                   );
                 })}
               </ul>
-              <button className={btn + " mt-3 min-h-11"}>Salvar atribuições</button>
+              <BotaoEnviar variante="primario" className="mt-3">Salvar atribuições</BotaoEnviar>
             </form>
           )}
         </section>

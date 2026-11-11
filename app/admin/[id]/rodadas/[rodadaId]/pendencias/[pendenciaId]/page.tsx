@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BotaoEnviar from "@/components/BotaoEnviar";
 import { notFound } from "next/navigation";
 import AbasRodada from "@/components/AbasRodada";
 import { btn, btn2, campo } from "@/components/estilos";
@@ -116,17 +117,17 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
             <label className="min-w-0 flex-1 text-sm font-medium">Responsável pela correção
               <input name="responsavel" defaultValue={p.responsavel} maxLength={120} placeholder="Nome de quem vai corrigir" className={campo + " min-h-11"} />
             </label>
-            <button className={btn2 + " min-h-11"}>Salvar responsável</button>
+            <BotaoEnviar variante="secundario">Salvar responsável</BotaoEnviar>
           </form>
           {situacao === "aberta" && (
-            <form action={iniciarCorrecao.bind(null, id, rodadaId, pendenciaId)} className="mt-3"><button className={btn2 + " min-h-11"}>Marcar como “Em correção”</button></form>
+            <form action={iniciarCorrecao.bind(null, id, rodadaId, pendenciaId)} className="mt-3"><BotaoEnviar variante="secundario">Marcar como “Em correção”</BotaoEnviar></form>
           )}
           {situacao !== "resolvida" && (
             <form id="correcao" action={registrarCorrecao.bind(null, id, rodadaId, pendenciaId)} className="mt-4 scroll-mt-4">
               <label className="block text-sm font-medium">Registrar o ajuste feito
                 <textarea name="nota" rows={3} required maxLength={3000} placeholder="Ex.: corrigida a validação do campo valor" className={campo + " field-sizing-content"} />
               </label>
-              <button className={btn2 + " mt-2 min-h-11"}>Registrar correção</button>
+              <BotaoEnviar variante="secundario" className="mt-2">Registrar correção</BotaoEnviar>
             </form>
           )}
           <form id="issue" action={vincularIssue.bind(null, id, rodadaId, pendenciaId)} className="mt-4 flex flex-wrap items-end gap-2 scroll-mt-4">
@@ -134,7 +135,7 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
               <input name="issue_url" type="url" defaultValue={p.issue_url ?? ""} placeholder="https://" className={campo + " min-h-11"} />
               <span className="mt-1 block text-xs font-normal text-slate-600">Só guarda o link. Não há integração com outras ferramentas.</span>
             </label>
-            <button className={btn2 + " min-h-11"}>Salvar link</button>
+            <BotaoEnviar variante="secundario">Salvar link</BotaoEnviar>
           </form>
           {p.issue_url && <p className="mt-2 text-sm"><a href={p.issue_url} target="_blank" rel="noreferrer" className="text-indigo-800 underline">Abrir issue<span className="sr-only"> (abre em nova aba)</span></a></p>}
         </section>

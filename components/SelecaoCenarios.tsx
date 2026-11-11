@@ -1,5 +1,6 @@
 "use client";
 
+import BotaoEnviar from "@/components/BotaoEnviar";
 import { useState } from "react";
 import { btn, btn2, campo } from "@/components/estilos";
 import { semAcento } from "@/lib/cenarios";
@@ -64,7 +65,7 @@ export default function SelecaoCenarios({ acao, cenarios, modulos, perfis }: { a
         ))}
       </ul>
       <div className="mt-3 flex flex-wrap gap-2">
-        <button className={btn + " min-h-11"}>Salvar cenários da rodada</button>
+        <BotaoEnviar variante="primario">Salvar cenários da rodada</BotaoEnviar>
         <button type="button" onClick={() => setMarcados(new Set(cenarios.filter(visivel).map((c) => c.id).concat([...marcados])))} className={btn2 + " min-h-11"}>Marcar os que aparecem</button>
       </div>
     </form>

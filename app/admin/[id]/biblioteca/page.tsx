@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BotaoEnviar from "@/components/BotaoEnviar";
 import { notFound } from "next/navigation";
 import { btn, btn2, campo } from "@/components/estilos";
 import { Confirmar } from "@/components/ui";
@@ -136,13 +137,13 @@ export default async function Page({ params, searchParams }: PageProps<"/admin/[
                 </dl>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link href={`/admin/${id}/biblioteca/${c.id}`} className={btn2 + " inline-flex min-h-11 items-center"}>Editar<span className="sr-only"> {c.titulo}</span></Link>
-                  <form action={duplicarCenario.bind(null, id, c.id)}><button className={btn2 + " min-h-11"}>Duplicar<span className="sr-only"> {c.titulo}</span></button></form>
+                  <form action={duplicarCenario.bind(null, id, c.id)}><BotaoEnviar variante="secundario">Duplicar<span className="sr-only"> {c.titulo}</span></BotaoEnviar></form>
                   {c.situacao === "ativo" ? (
                     <form action={mudarSituacaoCenario.bind(null, id, c.id, "arquivado")}>
                       <Confirmar texto={`Arquivar “${c.titulo}”? Ele sai da lista padrão, mas nada é apagado e dá para reativar.`} className={btn2 + " min-h-11"}>Arquivar<span className="sr-only"> {c.titulo}</span></Confirmar>
                     </form>
                   ) : (
-                    <form action={mudarSituacaoCenario.bind(null, id, c.id, "ativo")}><button className={btn2 + " min-h-11"}>Reativar<span className="sr-only"> {c.titulo}</span></button></form>
+                    <form action={mudarSituacaoCenario.bind(null, id, c.id, "ativo")}><BotaoEnviar variante="secundario">Reativar<span className="sr-only"> {c.titulo}</span></BotaoEnviar></form>
                   )}
                 </div>
               </li>
