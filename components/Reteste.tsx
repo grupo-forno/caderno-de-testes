@@ -51,7 +51,7 @@ export default function Reteste({ reteste, respostas, token, previa, aprovada, a
   const [envio, setEnvio] = useState<{ fase: "parado" | "enviando"; erro: string | null }>({ fase: "parado", erro: null });
   const [confirmando, setConfirmando] = useState(false);
   const [feito, setFeito] = useState<{ resultado: "resolvida" | "falhou" | "bloqueado"; situacao: SituacaoPendencia } | null>(reteste.status === "enviado" && reteste.resultado ? { resultado: reteste.resultado, situacao: reteste.pendenciaSituacao } : null);
-  const ps = usePassos(token && !previa ? { caderno: "", chave: token, api: "/api/rodada/reteste/resposta" } : null);
+  const ps = usePassos(token && !previa ? { chave: token, api: "/api/rodada/reteste/resposta" } : null);
   const { definir } = ps;
   const inicial = useRef(respostas);
   useEffect(() => {
@@ -153,8 +153,6 @@ export default function Reteste({ reteste, respostas, token, previa, aprovada, a
                 fila={fila}
                 posicao={pos}
                 resp={resp}
-                chave={token ?? ""}
-                slug=""
                 payloadUpload={JSON.stringify({ convite: token })}
                 rotuloItem="Reteste"
                 semLinkTela

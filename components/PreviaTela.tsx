@@ -67,8 +67,6 @@ export default function PreviaTela({ tela, moduloTitulo, paiTitulo, ambienteUrl,
             fila={fila}
             posicao={fila.indexOf(atual)}
             resp={{}}
-            chave=""
-            slug=""
             somenteLeitura={false}
             semLinkTela
             salvamento={{ texto: "", tipo: "ok" }}

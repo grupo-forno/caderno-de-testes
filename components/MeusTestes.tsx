@@ -112,7 +112,7 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
   const [confirmando, setConfirmando] = useState(false);
   const [retestes, setRetestes] = useState<RetesteDados[]>(dados.retestes ?? []);
   const [respRt, setRespRt] = useState<Record<string, RespPasso>>(dados.respostasReteste ?? {});
-  const cred = token && !previa ? { caderno: "", chave: token, api: "/api/rodada/resposta" } : null;
+  const cred = token && !previa ? { chave: token, api: "/api/rodada/resposta" } : null;
   const ps = usePassos(cred);
   const { definir } = ps;
 
@@ -261,8 +261,6 @@ export function MeusTestes({ dados, token, previa = false }: { dados: DadosRodad
                 fila={fila}
                 posicao={pos}
                 resp={resp}
-                chave={token ?? ""}
-                slug=""
                 payloadUpload={JSON.stringify({ convite: token })}
                 rotuloItem="Cenário"
                 semLinkTela

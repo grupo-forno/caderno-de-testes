@@ -6,7 +6,7 @@ import Imagem from "@/components/Imagem";
 import LinkTela from "@/components/LinkTela";
 import { acessoDaTela } from "@/lib/acesso";
 import { estadoPasso, passoCompleto, ROTULO_PASSO, RESULTADOS_PASSO, type EstadoPasso } from "@/lib/passos";
-import { ROTULO_SEVERIDADE, SEVERIDADES, type Item, type Modulo, type Passo, type RespPasso, type ResultadoPasso, type Severidade, type Tela } from "@/lib/tipos";
+import { type Item, type Modulo, type Passo, type RespPasso, type ResultadoPasso, type Tela } from "@/lib/tipos";
 
 const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
 const MAX_PRINTS = 10;
@@ -78,24 +78,19 @@ type Props = {
   fila: PassoFila[];
   posicao: number; // lugar do passo atual na fila geral (0 = primeiro)
   resp: Record<string, RespPasso>;
-  chave: string;
-  slug: string;
   somenteLeitura: boolean;
-  payloadUpload?: string; // texto enviado ao /api/upload para provar quem está anexando (padrão: caderno e chave)
+  payloadUpload?: string; // texto enviado ao /api/upload para provar quem está anexando (o convite do validador)
   rotuloItem?: string; // como chamar a unidade do teste: "Funcionalidade" (padrão) ou "Cenário"
   semLinkTela?: boolean; // dentro de uma rodada a tela não é uma página navegável
   salvamento: { texto: string; tipo: "ok" | "salvando" | "erro" };
   aoMudar: (itemId: string, passoId: string, patch: Partial<RespPasso>) => void;
   aoIr: (id: string) => void;
   aoSair: () => void;
-  gravidade?: Record<string, Severidade>; // gravidade da falha de cada funcionalidade (só no caderno; as rodadas não usam)
-  aoGravidade?: (itemId: string, sev: Severidade) => void;
-  erroGravidade?: string | null;
   ambienteUrl?: string | null; // endereço do ambiente de homologação do caderno (para telas que se abrem pelo menu)
   previa?: boolean; // prévia interna de quem prepara o teste: só leitura, nada é gravado
 };
 
-export default function Execucao({ atual, fila, posicao, resp, chave, slug, somenteLeitura, payloadUpload, rotuloItem = "Funcionalidade", semLinkTela, salvamento, aoMudar, aoIr, aoSair, gravidade, aoGravidade, erroGravidade, ambienteUrl, previa }: Props) {
+export default function Execucao({ atual, fila, posicao, resp, somenteLeitura, payloadUpload, rotuloItem = "Funcionalidade", semLinkTela, salvamento, aoMudar, aoIr, aoSair, ambienteUrl, previa }: Props) {
   const { passo, item, tela, modulo } = atual;
   const r = resp[passo.id];
   const estado = estadoPasso(r);
@@ -135,7 +130,7 @@ export default function Execucao({ atual, fila, posicao, resp, chave, slug, some
         continue;
       }
       try {
-        const b = await upload(f.name, f, { access: "public", handleUploadUrl: "/api/upload", clientPayload: payloadUpload ?? JSON.stringify({ caderno: slug, chave }) });
+        const b = await upload(f.name, f, { access: "public", handleUploadUrl: "/api/upload", clientPayload: payloadUpload });
         novos.push(b.url);
       } catch {
         avisos.push(`Não conseguimos enviar “${f.name}”. Confira sua internet e tente de novo. Se continuar, avise quem preparou o caderno.`);
@@ -382,28 +377,6 @@ export default function Execucao({ atual, fila, posicao, resp, chave, slug, some
                     </div>
                   )}
 
-                  {r.resultado === "diferente" && aoGravidade && (
-                    <fieldset className="mt-5 rounded-md border border-rose-200 bg-rose-50/50 p-3">
-                      <legend className="px-1 text-sm font-semibold">Quão grave é esta falha?</legend>
-                      <p className="text-xs text-slate-700">Vale para a funcionalidade “{item.nome}” inteira. Sem escolher, conta como “Impede de usar” e a homologação não pode ser concluída.</p>
-                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                        {SEVERIDADES.map((sv) => (
-                          <label
-                            key={sv}
-                            className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-indigo-600 ${
-                              gravidade?.[item.id] === sv ? "border-rose-600 bg-rose-50 text-rose-950" : "border-slate-400 bg-white hover:bg-slate-50"
-                            }`}
-                          >
-                            <input type="radio" name={`grav-${item.id}`} className="sr-only" checked={gravidade?.[item.id] === sv} onChange={() => aoGravidade(item.id, sv)} />
-                            {ROTULO_SEVERIDADE[sv]}
-                          </label>
-                        ))}
-                      </div>
-                      <p role="status" className="mt-2 text-sm text-slate-800">
-                        {erroGravidade ? <span className="font-semibold text-rose-800">{erroGravidade}</span> : gravidade?.[item.id] ? `Gravidade escolhida: ${ROTULO_SEVERIDADE[gravidade[item.id]]}.` : "Gravidade ainda não informada."}
-                      </p>
-                    </fieldset>
-                  )}
                 </div>
               )}
               {!r && <p className="mt-3 text-sm text-slate-700">Faça o passo e escolha o que aconteceu. Se ainda não deu para fazer, escolha “Não consegui testar”.</p>}
